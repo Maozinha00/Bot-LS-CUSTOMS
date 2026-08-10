@@ -1,26 +1,13 @@
 {
-  "name": "ls-customs-bot",
+  "name": "bot-oficina-mecanica",
   "version": "1.0.0",
-  "description": "Bot oficial da LS CUSTOMS para Discord",
-  "main": "index.js",
+  "description": "Bot completo para gerenciamento de mecânica FiveM no Discord",
+  "main": "bot.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js"
+    "start": "node bot.js"
   },
-  "keywords": [
-    "discord",
-    "bot",
-    "fivem",
-    "ls-customs",
-    "railway"
-  ],
-  "author": "LS Customs",
-  "license": "MIT",
   "dependencies": {
-    "discord.js": "^14.16.3",
+    "discord.js": "^14.14.1",
     "dotenv": "^16.4.5"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }
