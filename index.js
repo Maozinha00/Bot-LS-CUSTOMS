@@ -40,6 +40,10 @@ const commands = [
     .setDescription('Envia o painel fixo com botão para os membros solicitarem registro'),
 
   new SlashCommandBuilder()
+    .setName('painelponto')
+    .setDescription('Envia o Painel Fixado de Bate-Ponto Interativo no canal'),
+
+  new SlashCommandBuilder()
     .setName('registrar')
     .setDescription('Registra um novo integrante na LS CUSTOMS (Altera Nick e Atribui Cargo)')
     .addUserOption(option => 
@@ -320,6 +324,114 @@ client.on('interactionCreate', async interaction => {
       return;
     }
 
+    // 4️⃣ BOTÕES INTERATIVOS DE BATE-PONTO
+    if (interaction.isButton() && interaction.customId.startsWith('btn_ponto_')) {
+      const userId = interaction.user.id;
+      const now = new Date();
+
+      if (interaction.customId === 'btn_ponto_entrar') {
+        if (pontosAtivos.has(userId)) {
+          const data = pontosAtivos.get(userId);
+          const diffMs = now.getTime() - data.startTime.getTime();
+          const mins = Math.floor(diffMs / (1000 * 60));
+          return interaction.reply({
+            content: "⚠️ **Você já está em serviço!**\n\n⏰ **Entrada**: `" + data.startTime.toLocaleTimeString('pt-BR') + "`\n⏱️ **Tempo Decorrido**: `" + Math.floor(mins/60) + "h " + (mins%60) + "m`",
+            ephemeral: true
+          });
+        }
+
+        pontosAtivos.set(userId, { startTime: now });
+
+        const embed = new EmbedBuilder()
+          .setTitle('🟢 LS CUSTOMS — BATE-PONTO INICIADO')
+          .setDescription(
+            "👤 **Mecânico**: <@" + userId + ">\n" +
+            "⏰ **Horário de Entrada**: `" + now.toLocaleTimeString('pt-BR') + "`\n" +
+            "📻 **Rádio Oficial**: **633**\n\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+            "⚠️ **IMPORTANTE:** Lembre-se de estar fardado e em sintonia na rádio!\n" +
+            "🔧 *Bom trabalho e excelente turno!*"
+          )
+          .setColor('#2ecc71')
+          .setFooter({ text: 'Sistema de Bate-Ponto • LS CUSTOMS' })
+          .setTimestamp();
+
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      if (interaction.customId === 'btn_ponto_sair') {
+        if (!pontosAtivos.has(userId)) {
+          return interaction.reply({
+            content: "⚠️ **Você não possui um turno ativo no momento!**\nClique no botão **[ 🟢 Entrar em Serviço ]** para iniciar.",
+            ephemeral: true
+          });
+        }
+
+        const data = pontosAtivos.get(userId);
+        pontosAtivos.delete(userId);
+
+        const diffMs = now.getTime() - data.startTime.getTime();
+        const totalSecs = Math.floor(diffMs / 1000);
+        const hours = Math.floor(totalSecs / 3600);
+        const mins = Math.floor((totalSecs % 3600) / 60);
+        const secs = totalSecs % 60;
+        const tempoFormatado = (hours > 0 ? hours + "h " : "") + mins + "m " + secs + "s";
+
+        const embed = new EmbedBuilder()
+          .setTitle('🔴 LS CUSTOMS — BATE-PONTO FINALIZADO')
+          .setDescription(
+            "👤 **Mecânico**: <@" + userId + ">\n" +
+            "⏰ **Horário de Entrada**: `" + data.startTime.toLocaleTimeString('pt-BR') + "`\n" +
+            "⌛ **Horário de Saída**: `" + now.toLocaleTimeString('pt-BR') + "`\n" +
+            "⏱️ **Tempo Total em Serviço**: `" + tempoFormatado + "`\n\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+            "✅ *Turno encerrado e registrado no sistema. Bom descanso!*"
+          )
+          .setColor('#e74c3c')
+          .setFooter({ text: 'Sistema de Bate-Ponto • LS CUSTOMS' })
+          .setTimestamp();
+
+        return interaction.reply({ embeds: [embed] });
+      }
+
+      if (interaction.customId === 'btn_ponto_status') {
+        if (pontosAtivos.has(userId)) {
+          const data = pontosAtivos.get(userId);
+          const diffMs = now.getTime() - data.startTime.getTime();
+          const mins = Math.floor(diffMs / (1000 * 60));
+          return interaction.reply({
+            content: "🟢 **STATUS: EM SERVIÇO**\n\n⏰ **Entrada**: `" + data.startTime.toLocaleTimeString('pt-BR') + "`\n⏱️ **Tempo em Serviço**: `" + Math.floor(mins/60) + "h " + (mins%60) + "m`",
+            ephemeral: true
+          });
+        } else {
+          return interaction.reply({
+            content: "🔴 **STATUS: FORA DE SERVIÇO**\nVocê não possui ponto aberto no momento.",
+            ephemeral: true
+          });
+        }
+      }
+
+      if (interaction.customId === 'btn_ponto_online') {
+        const totalOn = pontosAtivos.size;
+        if (totalOn === 0) {
+          return interaction.reply({
+            content: "📊 **MECÂNICOS EM SERVIÇO (0)**\nNenhum mecânico está em serviço no momento.",
+            ephemeral: true
+          });
+        }
+
+        let lista = "📊 **MECÂNICOS EM SERVIÇO (" + totalOn + ")**\n\n";
+        for (const [id, item] of pontosAtivos.entries()) {
+          const diffMins = Math.floor((now.getTime() - item.startTime.getTime()) / (1000 * 60));
+          lista += "• <@" + id + "> — Desde `" + item.startTime.toLocaleTimeString('pt-BR') + "` (" + Math.floor(diffMins/60) + "h " + (diffMins%60) + "m)\n";
+        }
+
+        return interaction.reply({ content: lista, ephemeral: true });
+      }
+
+      return;
+    }
+
     // 3️⃣ COMANDOS SLASH
     if (!interaction.isChatInputCommand()) return;
 
@@ -352,6 +464,36 @@ client.on('interactionCreate', async interaction => {
           .setCustomId('btn_solicitar_registro')
           .setLabel('📋 Solicitar Set de Recruta')
           .setStyle(ButtonStyle.Primary)
+      );
+
+      return interaction.reply({ embeds: [embed], components: [row] });
+    }
+
+    // ⏱️ COMANDO /painelponto
+    if (commandName === 'painelponto') {
+      const embed = new EmbedBuilder()
+        .setTitle('⏱️ LS CUSTOMS — PAINEL DE BATE-PONTO')
+        .setDescription(
+          "🛠️ **REGISTRO DE TURNO & PRESENÇA DA EQUIPE**\n" +
+          "*Utilize os botões abaixo para gerenciar seu horário em serviço.*\n\n" +
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+          "🟢 **[ Entrar em Serviço ]** — Inicia a contagem do seu turno\n" +
+          "🔴 **[ Sair de Serviço ]** — Finaliza o turno e calcula horas trabalhadas\n" +
+          "📋 **[ Meu Status ]** — Consulta seu status e tempo decorrido\n" +
+          "📊 **[ Mecânicos On ]** — Exibe a lista de mecânicos em serviço\n\n" +
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+          "📻 **Rádio Obrigatória**: **633**\n" +
+          "⚠️ *É obrigatório bater ponto ao iniciar e finalizar o expediente!*\n\n" +
+          "🔧 **LS CUSTOMS** — *Qualidade e Desempenho Excepcionais*"
+        )
+        .setColor('#2ecc71')
+        .setFooter({ text: 'Painel Fixo de Bate-Ponto • LS CUSTOMS' });
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('btn_ponto_entrar').setLabel('🟢 Entrar em Serviço').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('btn_ponto_sair').setLabel('🔴 Sair de Serviço').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('btn_ponto_status').setLabel('📋 Meu Status').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('btn_ponto_online').setLabel('📊 Mecânicos On').setStyle(ButtonStyle.Primary)
       );
 
       return interaction.reply({ embeds: [embed], components: [row] });
