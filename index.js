@@ -25,8 +25,8 @@ const {
 } = require('discord.js');
 
 // 🔑 CONFIGURAÇÃO DO TOKEN E SERVIDOR
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN || 
-const GUILD_ID = process.env.GUILD_ID || '1535806745816072245'; // ID do Servidor para atualização instantânea
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const GUILD_ID = process.env.GUILD_ID || '1535806745816072245';
 
 // ID dos Canais Oficiais de Logs e Painéis
 const LOGS_CHANNEL_ID = process.env.LOGS_CHANNEL_ID || '1536308230936993792';
