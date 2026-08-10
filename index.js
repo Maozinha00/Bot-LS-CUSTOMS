@@ -241,18 +241,24 @@ client.on('interactionCreate', async interaction => {
     // 📋 COMANDO /painelregistro
     if (commandName === 'painelregistro') {
       const embed = new EmbedBuilder()
-        .setTitle('📋 PAINEL DE REGISTRO — LS CUSTOMS')
+        .setTitle('🔧 BEM-VINDO À ' + 'LS CUSTOMS'.toUpperCase())
         .setDescription(
-          "🚨 **SEJA BEM-VINDO À LS CUSTOMS!**\n\n" +
-          "Para solicitar seu **Set de Recruta** e entrar na equipe, clique no botão abaixo:\n\n" +
-          "👉 **[ 📋 Solicitar Set de Recruta ]**\n\n" +
-          "📌 **Ao clicar, informe:**\n" +
+          "Seja muito bem-vindo(a) à **LS CUSTOMS**!\n\n" +
+          "🚗 **Aqui trabalhamos com:**\n" +
+          "• Mecânica Geral & Manutenção\n" +
+          "• Reparos de Lataria e Engine\n" +
+          "• Personalização e Bodykits\n" +
+          "• Performance & Tuning\n" +
+          "• Pinturas e Acabamentos\n\n" +
+          "📜 **Antes de iniciar suas atividades ou solicitar atendimentos, leia atentamente as regras e frequências do servidor.**\n\n" +
+          "👉 **Para solicitar seu Set de Recruta, clique no botão abaixo:**\n" +
           "1️⃣ Nome e Sobrenome In-Game\n" +
           "2️⃣ Passaporte / ID In-Game\n\n" +
-          "⚙️ *O Bot alterará seu apelido para `[REC] Nome | #ID` e concederá o cargo de Recruta automaticamente!*"
+          "⚙️ *O Bot alterará seu apelido para `[REC] Nome | #ID` e concederá o cargo de Recruta automaticamente!*\n\n" +
+          "🔧 **LS CUSTOMS** — *Respeito • Organização • Compromisso*"
         )
         .setColor('#2ecc71')
-        .setFooter({ text: 'Sistema de Registro Automático • LS CUSTOMS' });
+        .setFooter({ text: 'LS CUSTOMS — Qualidade e Desempenho Excepcionais' });
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
