@@ -1,6 +1,6 @@
 // ========================================================
 // 🔧 LS CUSTOMS DISCORD BOT OFFICIAL SCRIPT (discord.js v14)
-// Otimizado para Railway / Replit / VPS - Pronto para rodar sem erros!
+// Otimizado para Railway / Replit / VPS - Com Formuário de 8 Perguntas & Bate-Ponto Ephemeral!
 // ========================================================
 
 try {
@@ -25,15 +25,14 @@ const {
 } = require('discord.js');
 
 // 🔑 CONFIGURAÇÃO DO TOKEN E SERVIDOR
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN || 'COLE_SEU_TOKEN_DO_DISCORD_AQUI';
 const GUILD_ID = process.env.GUILD_ID || '1535806745816072245';
-
 
 // ID dos Canais Oficiais de Logs e Painéis
 const LOGS_CHANNEL_ID = process.env.LOGS_CHANNEL_ID || '1536308230936993792';
 const PONTO_CHANNEL_ID = process.env.PONTO_CHANNEL_ID || '1536309622699466772';
 const DEMISSAO_CHANNEL_ID = process.env.DEMISSAO_CHANNEL_ID || '1536304188609400955';
-const RADIO_FREQ = '633';
+const RADIO_FREQ = process.env.RADIO_FREQ || '633';
 
 // Lista de Cargos e Tags Configuradas
 const ROLES_CONFIG = [
@@ -83,6 +82,9 @@ const client = new Client({
     GatewayIntentBits.GuildMembers
   ]
 });
+
+// Armazenamento em memória para dados de cadastro em 2 etapas
+const registrosTemporarios = new Map();
 
 // Banco de dados em memória para registrar bate-ponto (/ponto)
 const pontosAtivos = new Map();
@@ -145,7 +147,7 @@ client.once('ready', async () => {
   console.log("🔥 BOT ONLINE! Conectado como: " + client.user.tag);
   console.log('====================================================');
 
-  client.user.setActivity('🔧 LS CUSTOMS | Rádio 633', { type: 0 });
+  client.user.setActivity('🔧 LS CUSTOMS | Rádio ' + RADIO_FREQ, { type: 0 });
 
   if (!DISCORD_TOKEN || DISCORD_TOKEN === 'COLE_SEU_TOKEN_AQUI') {
     console.error('❌ ERRO CRÍTICO: Token do Discord não foi configurado!');
@@ -177,32 +179,206 @@ client.once('ready', async () => {
 // ⚡ GERENCIADOR DE INTERAÇÕES
 client.on('interactionCreate', async interaction => {
   try {
-    // 1️⃣ BOTÃO SOLICITAR REGISTRO
+    // 1️⃣ BOTÃO SOLICITAR REGISTRO (ETAPA 1 - DADOS PESSOAIS & EXPERIÊNCIA)
     if (interaction.isButton() && interaction.customId === 'btn_solicitar_registro') {
       const modal = new ModalBuilder()
-        .setCustomId('modal_registro')
-        .setTitle('Set de Recruta — LS CUSTOMS');
+        .setCustomId('modal_registro_etapa1')
+        .setTitle('LS CUSTOMS — Recrutamento (1/2)');
 
       const nomeInput = new TextInputBuilder()
         .setCustomId('reg_nome')
-        .setLabel('Nome e Sobrenome In-Game')
+        .setLabel('1. Nome e Sobrenome In-Game')
         .setPlaceholder('Ex: João Silva')
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
       const passaporteInput = new TextInputBuilder()
         .setCustomId('reg_passaporte')
-        .setLabel('Passaporte / ID In-Game')
-        .setPlaceholder('Ex: 1234')
+        .setLabel('2. Passaporte / ID In-Game')
+        .setPlaceholder('Ex: #1234')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      const idadeInput = new TextInputBuilder()
+        .setCustomId('reg_idade')
+        .setLabel('3. Idade (Requisito mínimo)')
+        .setPlaceholder('Ex: 18 anos')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      const expInput = new TextInputBuilder()
+        .setCustomId('reg_experiencia')
+        .setLabel('4. Já trabalhou como mecânico antes?')
+        .setPlaceholder('Sim / Não. Se sim, qual cidade?')
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(nomeInput),
-        new ActionRowBuilder().addComponents(passaporteInput)
+        new ActionRowBuilder().addComponents(passaporteInput),
+        new ActionRowBuilder().addComponents(idadeInput),
+        new ActionRowBuilder().addComponents(expInput)
       );
 
       return await interaction.showModal(modal);
+    }
+
+    // SUBMIT ETAPA 1 -> ABRE BOTAO PARA ETAPA 2
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_registro_etapa1') {
+      const nome = interaction.fields.getTextInputValue('reg_nome');
+      const passaporte = interaction.fields.getTextInputValue('reg_passaporte');
+      const idade = interaction.fields.getTextInputValue('reg_idade');
+      const experiencia = interaction.fields.getTextInputValue('reg_experiencia');
+
+      // Salva progresso temporário
+      registrosTemporarios.set(interaction.user.id, {
+        nome,
+        passaporte,
+        idade,
+        experiencia
+      });
+
+      const stepEmbed = new EmbedBuilder()
+        .setTitle('📋 LS CUSTOMS — RECRUTAMENTO (ETAPA 2/2)')
+        .setDescription(
+          "Great! Etapa 1 concluída com sucesso:\n\n" +
+          "👤 **Nome**: " + nome + "\n" +
+          "🆔 **Passaporte**: #" + passaporte + "\n" +
+          "🎂 **Idade**: " + idade + "\n" +
+          "🔧 **Experiência**: " + experiencia + "\n\n" +
+          "👉 **Clique no botão abaixo para responder as últimas 4 perguntas e enviar seu formulário para a liderança!**"
+        )
+        .setColor('#3498db');
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('btn_continuar_etapa2')
+          .setLabel('📝 Continuar Formuário (Etapa 2)')
+          .setStyle(ButtonStyle.Success)
+      );
+
+      return interaction.reply({
+        embeds: [stepEmbed],
+        components: [row],
+        ephemeral: true
+      });
+    }
+
+    // BOTÃO PARA ABRIR MODAL DA ETAPA 2
+    if (interaction.isButton() && interaction.customId === 'btn_continuar_etapa2') {
+      const modal = new ModalBuilder()
+        .setCustomId('modal_registro_etapa2')
+        .setTitle('LS CUSTOMS — Recrutamento (2/2)');
+
+      const porqueInput = new TextInputBuilder()
+        .setCustomId('reg_porque')
+        .setLabel('5. Por que quer entrar na LS CUSTOMS?')
+        .setPlaceholder('Explique sua motivação...')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true);
+
+      const dispInput = new TextInputBuilder()
+        .setCustomId('reg_disponibilidade')
+        .setLabel('6. Qual sua disponibilidade de horário?')
+        .setPlaceholder('Ex: Sim, diariamente (noite) / Alguns dias')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      const regrasInput = new TextInputBuilder()
+        .setCustomId('reg_regras')
+        .setLabel('7. Leu as regras, aceita ponto e hierarquia?')
+        .setPlaceholder('Sim, li todas e aceito bater ponto / cumprir ordens')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      const situacaoInput = new TextInputBuilder()
+        .setCustomId('reg_situacao')
+        .setLabel('8. Como lidaria com cliente problemático?')
+        .setPlaceholder('Descreva como agiria com respeito e paciência...')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(porqueInput),
+        new ActionRowBuilder().addComponents(dispInput),
+        new ActionRowBuilder().addComponents(regrasInput),
+        new ActionRowBuilder().addComponents(situacaoInput)
+      );
+
+      return await interaction.showModal(modal);
+    }
+
+    // SUBMIT FINAL ETAPA 2 -> ENVIA LOG COMPLETO DAS 8 PERGUNTAS PARA A LIDERANÇA
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_registro_etapa2') {
+      const temp = registrosTemporarios.get(interaction.user.id) || {
+        nome: 'N/A',
+        passaporte: '0000',
+        idade: 'N/A',
+        experiencia: 'N/A'
+      };
+
+      const porque = interaction.fields.getTextInputValue('reg_porque');
+      const disponibilidade = interaction.fields.getTextInputValue('reg_disponibilidade');
+      const regras = interaction.fields.getTextInputValue('reg_regras');
+      const situacao = interaction.fields.getTextInputValue('reg_situacao');
+
+      registrosTemporarios.delete(interaction.user.id);
+
+      const roleObj = ROLES_CONFIG.find(r => 
+        r.id === '1536304132980473896' ||
+        r.name.toLowerCase().includes('recruta') || 
+        r.tag.toLowerCase().includes('rec')
+      ) || { id: '1536304132980473896', name: 'Recruta', tag: 'Recruta' };
+
+      const tagCargo = roleObj.tag || 'Recruta';
+      const cargoNomeFinal = roleObj.name || 'Recruta';
+      const novoNick = ("|" + tagCargo + "| " + temp.nome + " | #" + temp.passaporte).substring(0, 32);
+
+      await interaction.reply({
+        content: "✅ **Formulário de Recrutamento Enviado com Sucesso!**\nTodas as 8 respostas foram enviadas para a Liderança da **LS CUSTOMS** no canal de logs. Aguarde a análise!",
+        ephemeral: true
+      });
+
+      try {
+        const logsChannel = await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null) || interaction.channel;
+
+        const logEmbed = new EmbedBuilder()
+          .setTitle('📋 NOVA SOLICITAÇÃO DE RECRUTAMENTO — 8 RESPOSTAS')
+          .setDescription("📌 **FORMULÁRIO PENDENTE DE APROVAÇÃO DA LIDERANÇA**\n\n" +
+            "👤 **1. Nome In-Game**: " + temp.nome + "\n" +
+            "🆔 **2. Passaporte**: #" + temp.passaporte + "\n" +
+            "🎂 **3. Idade**: " + temp.idade + "\n" +
+            "🔧 **4. Já trabalhou como mecânico?**: " + temp.experiencia + "\n" +
+            "🎯 **5. Por que entrar na LS CUSTOMS?**: " + porque + "\n" +
+            "⏰ **6. Disponibilidade**: " + disponibilidade + "\n" +
+            "📜 **7. Regras / Ponto / Hierarquia**: " + regras + "\n" +
+            "🤝 **8. Gestão de Clientes / Equipe**: " + situacao + "\n\n" +
+            "🎮 **USUÁRIO DISCORD**: <@" + interaction.user.id + "> (" + interaction.user.tag + ")\n" +
+            "🏷️ **NICK SUGERIDO**: `" + novoNick + "`\n\n" +
+            "⚙️ **STATUS**: ⏳ **Aguardando Análise da Liderança...**"
+          )
+          .setColor('#f1c40f')
+          .setFooter({ text: 'Sistema de Recrutamento • LS CUSTOMS' })
+          .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('btn_aprovar_' + interaction.user.id + '_' + encodeURIComponent(temp.nome) + '_' + temp.passaporte)
+            .setLabel('✅ Aprovar Set')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId('btn_recusar_' + interaction.user.id)
+            .setLabel('❌ Recusar Set')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+        if (logsChannel) {
+          await logsChannel.send({ embeds: [logEmbed], components: [row] });
+        }
+      } catch (err) {
+        console.error('Erro ao enviar log de formulário:', err);
+      }
+      return;
     }
 
     // 2️⃣ BOTÃO PROCESSAR DEMISSÃO
@@ -300,65 +476,7 @@ client.on('interactionCreate', async interaction => {
       });
     }
 
-    // 4️⃣ SUBMIT RECRUTA REGISTRO
-    if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
-      const nome = interaction.fields.getTextInputValue('reg_nome');
-      const passaporte = interaction.fields.getTextInputValue('reg_passaporte');
-
-      const roleObj = ROLES_CONFIG.find(r => 
-        r.id === '1536304132980473896' ||
-        r.name.toLowerCase().includes('recruta') || 
-        r.tag.toLowerCase().includes('rec')
-      ) || ROLES_CONFIG[ROLES_CONFIG.length - 1] || { id: '1536304132980473896', name: 'Recruta', tag: 'Recruta' };
-
-      const tagCargo = roleObj.tag || 'Recruta';
-      const cargoNomeFinal = roleObj.name || 'Recruta';
-      const novoNick = ("|" + tagCargo + "| " + nome + " | #" + passaporte).substring(0, 32);
-
-      await interaction.reply({
-        content: "⏳ **Solicitação de Set de Recruta enviada com sucesso!**\nEncaminhada para a liderança da **LS CUSTOMS** no canal de logs. Aguarde a aprovação!",
-        ephemeral: true
-      });
-
-      try {
-        const logsChannel = await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null) || interaction.channel;
-
-        const logEmbed = new EmbedBuilder()
-          .setTitle('📋 NOVA SOLICITAÇÃO DE SET DE RECRUTA — LS CUSTOMS')
-          .setDescription(
-            "📌 **SOLICITAÇÃO PENDENTE DE APROVAÇÃO DA LIDERANÇA**\n\n" +
-            "👤 **NOME IN-GAME**: " + nome + "\n" +
-            "🆔 **PASSAPORTE**: #" + passaporte + "\n" +
-            "🔰 **CARGO SOLICITADO**: " + cargoNomeFinal + "\n" +
-            "🎮 **USUÁRIO DISCORD**: <@" + interaction.user.id + "> (" + interaction.user.tag + ")\n" +
-            "🏷️ **NOVO NICK SUGERIDO**: `" + novoNick + "`\n\n" +
-            "⚙️ **STATUS**: ⏳ **Aguardando Análise da Liderança...**"
-          )
-          .setColor('#f1c40f')
-          .setFooter({ text: 'Sistema de Registro & Logs • LS CUSTOMS' })
-          .setTimestamp();
-
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId('btn_aprovar_' + interaction.user.id + '_' + encodeURIComponent(nome) + '_' + passaporte)
-            .setLabel('✅ Aprovar Set')
-            .setStyle(ButtonStyle.Success),
-          new ButtonBuilder()
-            .setCustomId('btn_recusar_' + interaction.user.id)
-            .setLabel('❌ Recusar Set')
-            .setStyle(ButtonStyle.Danger)
-        );
-
-        if (logsChannel) {
-          await logsChannel.send({ embeds: [logEmbed], components: [row] });
-        }
-      } catch (err) {
-        console.error('Erro ao enviar log:', err);
-      }
-      return;
-    }
-
-    // 5️⃣ CLIQUE NOS BOTÕES DE APROVAÇÃO
+    // 4️⃣ CLIQUE NOS BOTÕES DE APROVAÇÃO
     if (interaction.isButton() && (interaction.customId.startsWith('btn_aprovar_') || interaction.customId.startsWith('btn_recusar_'))) {
       const isApprove = interaction.customId.startsWith('btn_aprovar_');
       const parts = interaction.customId.split('_');
@@ -374,7 +492,7 @@ client.on('interactionCreate', async interaction => {
           r.id === '1536304132980473896' ||
           r.name.toLowerCase().includes('recruta') || 
           r.tag.toLowerCase().includes('rec')
-        ) || ROLES_CONFIG[ROLES_CONFIG.length - 1] || { id: '1536304132980473896', name: 'Recruta', tag: 'Recruta' };
+        ) || { id: '1536304132980473896', name: 'Recruta', tag: 'Recruta' };
 
         const tagCargo = roleObj.tag || 'Recruta';
         const cargoNomeFinal = roleObj.name || 'Recruta';
@@ -411,7 +529,7 @@ client.on('interactionCreate', async interaction => {
         } catch (e) {}
 
         const approvedEmbed = new EmbedBuilder()
-          .setTitle('✅ SET DE RECRUTA APROVADO — LS CUSTOMS')
+          .setTitle('✅ RECRUTAMENTO APROVADO — LS CUSTOMS')
           .setDescription(
             "🎉 **SOLICITAÇÃO APROVADA COM SUCESSO!**\n\n" +
             "👤 **NOME**: " + nome + "\n" +
@@ -424,7 +542,7 @@ client.on('interactionCreate', async interaction => {
             "⚙️ **Status Cargo**: " + roleStatus
           )
           .setColor('#2ecc71')
-          .setFooter({ text: 'Sistema de Registro Automático • LS CUSTOMS' })
+          .setFooter({ text: 'Sistema de Recrutamento Automático • LS CUSTOMS' })
           .setTimestamp();
 
         const disabledRow = new ActionRowBuilder().addComponents(
@@ -434,15 +552,15 @@ client.on('interactionCreate', async interaction => {
         await interaction.update({ embeds: [approvedEmbed], components: [disabledRow] });
       } else {
         const rejectedEmbed = new EmbedBuilder()
-          .setTitle('❌ SET DE RECRUTA RECUSADO — LS CUSTOMS')
+          .setTitle('❌ RECRUTAMENTO RECUSADO — LS CUSTOMS')
           .setDescription(
-            "❌ **SOLICITAÇÃO DE REGISTRO RECUSADA**\n\n" +
+            "❌ **SOLICITAÇÃO DE RECRUTAMENTO RECUSADA**\n\n" +
             "🎮 **USUÁRIO**: <@" + targetUserId + ">\n" +
             "👑 **RECUSADO POR**: <@" + staffUser.id + ">\n\n" +
             "📌 *A solicitação foi indeferida pela liderança.*"
           )
           .setColor('#e74c3c')
-          .setFooter({ text: 'Sistema de Registro Automático • LS CUSTOMS' })
+          .setFooter({ text: 'Sistema de Recrutamento Automático • LS CUSTOMS' })
           .setTimestamp();
 
         const disabledRow = new ActionRowBuilder().addComponents(
@@ -454,7 +572,7 @@ client.on('interactionCreate', async interaction => {
       return;
     }
 
-    // 6️⃣ BATE-PONTO INTERATIVO
+    // 5️⃣ BATE-PONTO INTERATIVO (COM RESPOSTA PRIVADA / EPHEMERAL E LOG PÚBLICO SEPARADO!)
     if (interaction.isButton() && interaction.customId.startsWith('btn_ponto_')) {
       const userId = interaction.user.id;
       const now = new Date();
@@ -486,8 +604,10 @@ client.on('interactionCreate', async interaction => {
           .setFooter({ text: 'Sistema de Bate-Ponto • LS CUSTOMS' })
           .setTimestamp();
 
+        // Envia log público no canal de ponto para registro
         try {
-          const pontoChannel = await interaction.guild.channels.fetch(PONTO_CHANNEL_ID).catch(() => null);
+          const pontoChannel = await interaction.guild.channels.fetch(PONTO_CHANNEL_ID).catch(() => null) ||
+            await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
           if (pontoChannel) {
             const entryLogEmbed = new EmbedBuilder()
               .setTitle('🟢 LS CUSTOMS — REGISTRO DE ENTRADA EM SERVIÇO')
@@ -505,6 +625,7 @@ client.on('interactionCreate', async interaction => {
           }
         } catch (err) {}
 
+        // Resposta PRIVADA (Ephemeral) ao clicar no botão ("Só você pode ver esta mensagem")
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -526,7 +647,7 @@ client.on('interactionCreate', async interaction => {
         const secs = totalSecs % 60;
         const tempoFormatado = (hours > 0 ? hours + "h " : "") + mins + "m " + secs + "s";
 
-        const embed = new EmbedBuilder()
+        const logEmbed = new EmbedBuilder()
           .setTitle('🔴 LS CUSTOMS — BATE-PONTO FINALIZADO')
           .setDescription(
             "👤 **Mecânico**: <@" + userId + ">\n" +
@@ -540,15 +661,20 @@ client.on('interactionCreate', async interaction => {
           .setFooter({ text: 'Sistema de Bate-Ponto • LS CUSTOMS' })
           .setTimestamp();
 
+        // 1. ENVIA LOG PÚBLICO PARA O CANAL DE PONTO / LOGS PARA A LIDERANÇA ACOMPANHAR
         try {
-          const pontoChannel = (PONTO_CHANNEL_ID ? await interaction.guild.channels.fetch(PONTO_CHANNEL_ID).catch(() => null) : null) ||
-            (LOGS_CHANNEL_ID ? await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null) : null);
-          if (pontoChannel && pontoChannel.id !== interaction.channelId) {
-            await pontoChannel.send({ embeds: [embed] });
+          const pontoChannel = await interaction.guild.channels.fetch(PONTO_CHANNEL_ID).catch(() => null) ||
+            await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
+          if (pontoChannel) {
+            await pontoChannel.send({ embeds: [logEmbed] });
           }
-        } catch (err) {}
+        } catch (err) {
+          console.error("Erro ao publicar log público de saída:", err);
+        }
 
-        return interaction.reply({ embeds: [embed] });
+        // 2. RETORNA RESPOSTA PRIVADA (EPHEMERAL) AO USUÁRIO QUE CLICOU NO BOTÃO
+        // Exibirá "Só você pode ver esta mensagem" no Discord!
+        return interaction.reply({ embeds: [logEmbed], ephemeral: true });
       }
 
       if (interaction.customId === 'btn_ponto_status') {
@@ -589,13 +715,13 @@ client.on('interactionCreate', async interaction => {
       return;
     }
 
-    // 7️⃣ COMANDOS SLASH CHAT
+    // 6️⃣ COMANDOS SLASH CHAT
     if (!interaction.isChatInputCommand()) return;
     const { commandName, options, user, guild } = interaction;
 
     if (commandName === 'painelregistro') {
       const embed = new EmbedBuilder()
-        .setTitle('🔧 BEM-VINDO À ' + 'LS CUSTOMS'.toUpperCase())
+        .setTitle('🔧 BEM-VINDO À LS CUSTOMS')
         .setDescription(
           "Seja muito bem-vindo(a) à **LS CUSTOMS**!\n\n" +
           "🚗 **Aqui trabalhamos com:**\n" +
@@ -605,10 +731,10 @@ client.on('interactionCreate', async interaction => {
           "• Performance & Tuning\n" +
           "• Pinturas e Acabamentos\n\n" +
           "📜 **Leia atentamente as regras e frequências do servidor antes de iniciar suas atividades.**\n\n" +
-          "👉 **Para solicitar seu Set de Recruta, clique no botão abaixo:**\n" +
-          "1️⃣ Nome e Sobrenome In-Game\n" +
-          "2️⃣ Passaporte / ID In-Game\n\n" +
-          "⚙️ *O Bot alterará seu apelido para `[REC] Nome | #ID` e concederá o cargo de Recruta automaticamente!*\n\n" +
+          "👉 **Para solicitar seu Recrutamento, clique no botão abaixo e responda às 8 perguntas do formulário:**\n" +
+          "1️⃣ Dados Pessoais & In-Game\n" +
+          "2️⃣ Regras, Motivação & Disponibilidade\n\n" +
+          "⚙️ *Após a aprovação da Liderança, seu apelido será alterado para `[REC] Nome | #ID` e o cargo concedido!*\n\n" +
           "🔧 **LS CUSTOMS** — *Respeito • Organização • Compromisso*"
         )
         .setColor('#2ecc71')
@@ -618,7 +744,7 @@ client.on('interactionCreate', async interaction => {
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('btn_solicitar_registro')
-          .setLabel('📋 Solicitar Set de Recruta')
+          .setLabel('📋 Responder Formuário (8 Perguntas)')
           .setStyle(ButtonStyle.Primary)
       );
 
@@ -633,7 +759,7 @@ client.on('interactionCreate', async interaction => {
           "*Utilize os botões abaixo para gerenciar seu horário em serviço.*\n\n" +
           "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
           "🟢 **[ Entrar em Serviço ]** — Inicia a contagem do seu turno\n" +
-          "🔴 **[ Sair de Serviço ]** — Finaliza o turno e calcula horas trabalhadas\n" +
+          "🔴 **[ Sair de Serviço ]** — Finaliza o turno (Notificação Privada + Log Público)\n" +
           "📋 **[ Meu Status ]** — Consulta seu status e tempo decorrido\n" +
           "📊 **[ Mecânicos On ]** — Exibe a lista de mecânicos em serviço\n\n" +
           "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
@@ -822,7 +948,7 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'tabela') {
       const embed = new EmbedBuilder()
         .setTitle('💰 TABELA DE PREÇOS — LS CUSTOMS')
-        .setDescription("**🛠️ ITENS**\nKit de Reparo Básico: **R$ 1.000** | Kit de Reparo Avançado: **R$ 2.500** | Chave Inglesa: **R$ 2.000** | Pneu: **R$ 500**\n\n**🚗 PERSONALIZAÇÃO**\nSaias Laterais: **R$ 2.000** | Parachoque Dianteiro: **R$ 2.000** | Parachoque Traseiro: **R$ 2.000** | Buzina Custom: **R$ 1.500** | Capô Custom: **R$ 2.000** | Escapamento Especial: **R$ 2.000** | Faróis Xenon: **R$ 3.500** | Paralamas Widebody: **R$ 2.000** | Placa Personalizada: **R$ 1.500** | Carroceria Reforçada: **R$ 2.000** | Aerofólio Carbono: **R$ 2.000**\n\n**✨ COSMÉTICOS VEÍCULOS**\nBancos Concha: **R$ 2.000** | Pinturas Extras: **R$ 2.000** | Fumaça do Pneu Colorida: **R$ 2.500** | Cor dos Faróis: **R$ 1.500** | Kit Neon Underglow: **R$ 2.500** | Insufilm / G5: **R$ 1.500** | Som de Porta-Malas: **R$ 2.000** | Volantes Esportivos: **R$ 2.000** | Rodas Especiais: **R$ 5.000**\n\n**⚙️ FREIOS**\nFreios Nível 1: **R$ 10.000** | Freios Nível 2: **R$ 15.000** | Freios Nível 3 (Brembo): **R$ 18.000**\n\n**🏁 MOTOR**\nMotor Nível 1: **R$ 12.000** | Motor Nível 2: **R$ 18.000** | Motor Nível 3 (Estágio 3): **R$ 22.000** | Kit Turbo Performance: **R$ 15.000**\n\n**🔩 SUSPENSÃO**\nSuspensão Nível 1: **R$ 10.000** | Suspensão Nível 2: **R$ 14.000** | Suspensão Nível 3: **R$ 18.000** | Suspensão Ar Nível 4: **R$ 22.000**\n\n**⚡ TRANSMISSÃO**\nTransmissão Nível 1: **R$ 12.000** | Transmissão Nível 2: **R$ 18.000** | Transmissão Nível 3: **R$ 22.000**\n\n**🎨 PINTURA**\nCor Primária: **R$ 1.500** | Cor Secundária: **R$ 1.500** | Cor Camaleão / Perolizada: **R$ 2.500** | Cor da Roda: **R$ 1.000**\n\n")
+        .setDescription("**🛠️ ITENS**\nKit de Reparo Básico: **R$ 1.000** | Kit de Reparo Avançado: **R$ 2.500** | Chave Inglesa: **R$ 2.000** | Pneu: **R$ 500**\n\n**🚗 PERSONALIZAÇÃO**\nParachoque Dianteiro/Traseiro/Saias: **R$ 2.000** | Faróis Xenon: **R$ 3.500** | Placa Personalizada: **R$ 1.500** | Aerofólio: **R$ 2.000**\n\n**⚙️ PERFORMANCE**\nMotor Nível 1: **R$ 12.000** | Motor Nível 2: **R$ 18.000** | Motor Nível 3: **R$ 22.000** | Kit Turbo: **R$ 15.000**\n\n**🔩 SUSPENSÃO & FREIOS**\nFreios Nível 3: **R$ 18.000** | Suspensão a Ar Nível 4: **R$ 22.000**\n\n**🎨 PINTURA**\nPrimária/Secundária: **R$ 1.500** | Camaleão: **R$ 2.500**")
         .setColor('#f1c40f')
         .setFooter({ text: 'Tabela Sujeita a Alterações Sem Aviso Prévio • LS CUSTOMS' })
         .setTimestamp();
