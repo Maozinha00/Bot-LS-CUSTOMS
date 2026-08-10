@@ -612,7 +612,7 @@ client.on('interactionCreate', async interaction => {
           "🔧 **LS CUSTOMS** — *Respeito • Organização • Compromisso*"
         )
         .setColor('#2ecc71')
-        .setImage('https://i.imgur.com/FMR4pQg.png')
+        .setImage('https://i.imgur.com/Vv2juos.jpeg')
         .setFooter({ text: 'LS CUSTOMS — Qualidade e Desempenho Excepcionais' });
 
       const row = new ActionRowBuilder().addComponents(
