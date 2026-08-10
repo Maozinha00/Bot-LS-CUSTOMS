@@ -23,9 +23,11 @@ const {
   TextInputBuilder, 
   TextInputStyle 
 } = require('discord.js');
+
 // 🔑 CONFIGURAÇÃO DO TOKEN E SERVIDOR
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GUILD_ID = process.env.GUILD_ID || '1535806745816072245';
+
 
 // ID dos Canais Oficiais de Logs e Painéis
 const LOGS_CHANNEL_ID = process.env.LOGS_CHANNEL_ID || '1536308230936993792';
@@ -610,6 +612,7 @@ client.on('interactionCreate', async interaction => {
           "🔧 **LS CUSTOMS** — *Respeito • Organização • Compromisso*"
         )
         .setColor('#2ecc71')
+        .setImage('https://i.imgur.com/FMR4pQg.png')
         .setFooter({ text: 'LS CUSTOMS — Qualidade e Desempenho Excepcionais' });
 
       const row = new ActionRowBuilder().addComponents(
