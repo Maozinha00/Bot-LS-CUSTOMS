@@ -23,7 +23,6 @@ const {
   TextInputBuilder, 
   TextInputStyle 
 } = require('discord.js');
-
 // 🔑 CONFIGURAÇÃO DO TOKEN E SERVIDOR
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GUILD_ID = process.env.GUILD_ID || '1535806745816072245';
@@ -128,26 +127,6 @@ const commands = [
           { name: '🔧 MEMBRO', value: '🔧 MEMBRO' },
           { name: '🔰 RECRUTA', value: '🔰 RECRUTA' }
         )),
-
-  new SlashCommandBuilder()
-    .setName('abrir')
-    .setDescription('Anuncia que a oficina da LS CUSTOMS está ABERTA 🟢'),
-
-  new SlashCommandBuilder()
-    .setName('fechar')
-    .setDescription('Anuncia que a oficina da LS CUSTOMS está FECHADA 🔴'),
-
-  new SlashCommandBuilder()
-    .setName('anunciarmec')
-    .setDescription('Envia um comunicado oficial da LS CUSTOMS')
-    .addStringOption(option => 
-      option.setName('titulo').setDescription('Título do comunicado').setRequired(true))
-    .addStringOption(option => 
-      option.setName('mensagem').setDescription('Conteúdo da mensagem').setRequired(true)),
-
-  new SlashCommandBuilder()
-    .setName('ponto')
-    .setDescription('Inicia ou finaliza o seu turno no bate-ponto com cálculo de tempo'),
 
   new SlashCommandBuilder()
     .setName('tabela')
@@ -559,6 +538,14 @@ client.on('interactionCreate', async interaction => {
           .setFooter({ text: 'Sistema de Bate-Ponto • LS CUSTOMS' })
           .setTimestamp();
 
+        try {
+          const pontoChannel = (PONTO_CHANNEL_ID ? await interaction.guild.channels.fetch(PONTO_CHANNEL_ID).catch(() => null) : null) ||
+            (LOGS_CHANNEL_ID ? await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null) : null);
+          if (pontoChannel && pontoChannel.id !== interaction.channelId) {
+            await pontoChannel.send({ embeds: [embed] });
+          }
+        } catch (err) {}
+
         return interaction.reply({ embeds: [embed] });
       }
 
@@ -815,57 +802,6 @@ client.on('interactionCreate', async interaction => {
       });
     }
 
-    if (commandName === 'abrir') {
-      const embed = new EmbedBuilder()
-        .setTitle('🔧 LS CUSTOMS — ABERTA 🟢')
-        .setDescription(
-          "🚨 **A LS CUSTOMS ESTÁ ABERTA!**\n\n" +
-          "🔧 Já estamos realizando atendimentos!\n\n" +
-          "🚗 Reparos e Revisões\n" +
-          "🏎️ Kits de Performance\n" +
-          "🎨 Pintura e Estética\n" +
-          "🛞 Pneus e Suspensão\n\n" +
-          "📍 Frequência da Rádio: **" + RADIO_FREQ + "**\n" +
-          "📍 Venha até a oficina e deixe seu veículo no estilo!\n\n" +
-          "🔥 **LS CUSTOMS**\n*Seu carro, nosso compromisso!*"
-        )
-        .setColor('#2ecc71')
-        .setFooter({ text: "Aberto por " + user.username })
-        .setTimestamp();
-
-      return interaction.reply({ content: '@everyone 🚨 A OFICINA ESTÁ ABERTA!', embeds: [embed] });
-    }
-
-    if (commandName === 'fechar') {
-      const embed = new EmbedBuilder()
-        .setTitle('🔧 LS CUSTOMS — FECHADA 🔴')
-        .setDescription(
-          "🚨 **A LS CUSTOMS ESTÁ FECHADA!**\n\n" +
-          "⛔ No momento encerramos os atendimentos do turno.\n" +
-          "📢 Fique atento ao canal para o próximo aviso de abertura.\n\n" +
-          "🔥 **LS CUSTOMS**\n*Obrigado pela preferência e até breve!*"
-        )
-        .setColor('#e74c3c')
-        .setFooter({ text: "Fechado por " + user.username })
-        .setTimestamp();
-
-      return interaction.reply({ content: '🚨 A oficina fechou no momento.', embeds: [embed] });
-    }
-
-    if (commandName === 'anunciarmec') {
-      const titulo = options.getString('titulo');
-      const mensagem = options.getString('mensagem');
-
-      const embed = new EmbedBuilder()
-        .setTitle("📢 " + titulo)
-        .setDescription(mensagem)
-        .setColor('#9b59b6')
-        .setFooter({ text: "Comunicado Oficial • " + user.username })
-        .setTimestamp();
-
-      return interaction.reply({ embeds: [embed] });
-    }
-
     if (commandName === 'radio') {
       const embed = new EmbedBuilder()
         .setTitle('📻 RÁDIO OFICIAL — LS CUSTOMS')
@@ -889,51 +825,6 @@ client.on('interactionCreate', async interaction => {
         .setTimestamp();
 
       return interaction.reply({ embeds: [embed], ephemeral: true });
-    }
-
-    if (commandName === 'ponto') {
-      const now = new Date();
-      const userId = user.id;
-
-      if (pontosAtivos.has(userId)) {
-        const startTime = pontosAtivos.get(userId);
-        pontosAtivos.delete(userId);
-
-        const diffMs = now.getTime() - startTime.getTime();
-        const diffMins = Math.floor(diffMs / (1000 * 60));
-        const hours = Math.floor(diffMins / 60);
-        const mins = diffMins % 60;
-        const durationStr = hours > 0 ? (hours + "h " + mins + "m") : (mins + " minuto(s)");
-
-        const embed = new EmbedBuilder()
-          .setTitle('🔴 BATE-PONTO — TURNO FINALIZADO')
-          .setDescription(
-            "👤 **Mecânico**: <@" + userId + ">\n" +
-            "⏱️ **Tempo em Serviço**: `" + durationStr + "`\n" +
-            "📅 **Entrada**: " + startTime.toLocaleTimeString('pt-BR') + "\n" +
-            "📅 **Saída**: " + now.toLocaleTimeString('pt-BR') + "\n\n" +
-            "✅ Turno encerrado com sucesso. Bom descanso!"
-          )
-          .setColor('#e74c3c')
-          .setTimestamp();
-
-        return interaction.reply({ embeds: [embed] });
-      } else {
-        pontosAtivos.set(userId, now);
-
-        const embed = new EmbedBuilder()
-          .setTitle('🟢 BATE-PONTO — TURNO INICIADO')
-          .setDescription(
-            "👤 **Mecânico**: <@" + userId + ">\n" +
-            "⏰ **Horário de Entrada**: " + now.toLocaleTimeString('pt-BR') + "\n" +
-            "📻 **Rádio Obrigatória**: **" + RADIO_FREQ + "**\n\n" +
-            "⚠️ Lembre-se de estar com o uniforme oficial da **LS CUSTOMS**!"
-          )
-          .setColor('#2ecc71')
-          .setTimestamp();
-
-        return interaction.reply({ embeds: [embed] });
-      }
     }
 
   } catch (error) {
