@@ -1,8 +1,3 @@
-// ========================================================
-// 🔧 LS CUSTOMS DISCORD BOT OFFICIAL SCRIPT (discord.js v14)
-// Otimizado para Railway / Replit / VPS - Com Formuário de 8 Perguntas & Bate-Ponto Ephemeral!
-// ========================================================
-
 try {
   require('dotenv').config();
 } catch (e) {
