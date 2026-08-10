@@ -65,9 +65,9 @@ const ROLES_CONFIG = [
     "icon": "🔧"
   },
   {
-    "id": "5",
+    "id": "1536304132980473896",
     "name": "🔰 RECRUTA",
-    "tag": "REC",
+    "tag": "Recruta",
     "color": "#95a5a6",
     "icon": "🔰"
   }
@@ -325,13 +325,14 @@ client.on('interactionCreate', async interaction => {
       const passaporte = interaction.fields.getTextInputValue('reg_passaporte');
 
       const roleObj = ROLES_CONFIG.find(r => 
+        r.id === '1536304132980473896' ||
         r.name.toLowerCase().includes('recruta') || 
         r.tag.toLowerCase().includes('rec')
-      ) || ROLES_CONFIG[ROLES_CONFIG.length - 1] || { name: 'Recruta', tag: 'REC' };
+      ) || ROLES_CONFIG[ROLES_CONFIG.length - 1] || { id: '1536304132980473896', name: 'Recruta', tag: 'Recruta' };
 
-      const tagCargo = roleObj.tag || 'REC';
+      const tagCargo = roleObj.tag || 'Recruta';
       const cargoNomeFinal = roleObj.name || 'Recruta';
-      const novoNick = ("[" + tagCargo + "] " + nome + " | #" + passaporte).substring(0, 32);
+      const novoNick = ("|" + tagCargo + "| " + nome + " | #" + passaporte).substring(0, 32);
 
       await interaction.reply({
         content: "⏳ **Solicitação de Set de Recruta enviada com sucesso!**\nEncaminhada para a liderança da **LS CUSTOMS** no canal de logs. Aguarde a aprovação!",
@@ -389,13 +390,15 @@ client.on('interactionCreate', async interaction => {
         const passaporte = parts[4] || '';
 
         const roleObj = ROLES_CONFIG.find(r => 
+          r.id === '1536304132980473896' ||
           r.name.toLowerCase().includes('recruta') || 
           r.tag.toLowerCase().includes('rec')
-        ) || ROLES_CONFIG[ROLES_CONFIG.length - 1] || { name: 'Recruta', tag: 'REC' };
+        ) || ROLES_CONFIG[ROLES_CONFIG.length - 1] || { id: '1536304132980473896', name: 'Recruta', tag: 'Recruta' };
 
-        const tagCargo = roleObj.tag || 'REC';
+        const tagCargo = roleObj.tag || 'Recruta';
         const cargoNomeFinal = roleObj.name || 'Recruta';
-        const novoNick = ("[" + tagCargo + "] " + nome + " | #" + passaporte).substring(0, 32);
+        const roleIdConfig = roleObj.id || '1536304132980473896';
+        const novoNick = ("|" + tagCargo + "| " + nome + " | #" + passaporte).substring(0, 32);
 
         let nickStatus = '✅ Alterado com sucesso';
         let roleStatus = '✅ Cargo atribuído';
@@ -404,15 +407,19 @@ client.on('interactionCreate', async interaction => {
           const targetMember = await guild.members.fetch(targetUserId).catch(() => null);
           if (targetMember) {
             if (targetMember.manageable) {
-              await targetMember.setNickname(novoNick).catch(() => { nickStatus = '⚠️ Erro ao alterar apelido'; });
+              await targetMember.setNickname(novoNick).catch(() => { nickStatus = '⚠️ Sem permissão para alterar nick'; });
             } else {
               nickStatus = '⚠️ Sem permissão para alterar nick';
             }
 
-            const discordRole = guild.roles.cache.find(r => 
-              r.name.toUpperCase().includes(cargoNomeFinal.toUpperCase()) || 
-              cargoNomeFinal.toUpperCase().includes(r.name.toUpperCase())
-            );
+            const discordRole = (roleIdConfig ? guild.roles.cache.get(roleIdConfig) : null) ||
+              guild.roles.cache.get('1536304132980473896') ||
+              guild.roles.cache.find(r => 
+                r.id === roleIdConfig ||
+                r.name.toUpperCase().includes(cargoNomeFinal.toUpperCase()) || 
+                cargoNomeFinal.toUpperCase().includes(r.name.toUpperCase()) ||
+                r.name.toUpperCase().includes('RECRUTA')
+              );
 
             if (discordRole) {
               await targetMember.roles.add(discordRole).catch(() => { roleStatus = '⚠️ Erro ao adicionar cargo'; });
@@ -747,9 +754,10 @@ client.on('interactionCreate', async interaction => {
         return interaction.reply({ content: '❌ Usuário não encontrado neste servidor!', ephemeral: true });
       }
 
-      const roleObj = ROLES_CONFIG.find(r => r.name === cargo);
-      const tagCargo = roleObj ? roleObj.tag : 'Membro';
-      const novoNick = ("[" + tagCargo + "] " + nome + " | #" + passaporte).substring(0, 32);
+      const roleObj = ROLES_CONFIG.find(r => r.name === cargo || (cargo.toLowerCase().includes('recruta') && (r.id === '1536304132980473896' || r.name.toLowerCase().includes('recruta'))));
+      const tagCargo = roleObj ? roleObj.tag : cargo;
+      const roleIdConfig = roleObj ? roleObj.id : (cargo.toLowerCase().includes('recruta') ? '1536304132980473896' : '');
+      const novoNick = ("|" + tagCargo + "| " + nome + " | #" + passaporte).substring(0, 32);
 
       let nickStatus = '✅ Alterado com sucesso';
       let roleStatus = '✅ Cargo atribuído';
@@ -758,25 +766,30 @@ client.on('interactionCreate', async interaction => {
         try {
           await member.setNickname(novoNick);
         } catch (e) {
-          nickStatus = '⚠️ Sem permissão de cargo do bot';
+          nickStatus = '⚠️ Sem permissão para alterar nick';
         }
       } else {
-        nickStatus = '⚠️ Usuário possui cargo superior ao bot';
+        nickStatus = '⚠️ Sem permissão para alterar nick (O bot precisa estar acima do membro nos cargos)';
       }
 
-      const discordRole = guild.roles.cache.find(r => 
-        r.name.toUpperCase().includes(cargo.toUpperCase()) || 
-        cargo.toUpperCase().includes(r.name.toUpperCase())
-      );
+      const discordRole = (roleIdConfig ? guild.roles.cache.get(roleIdConfig) : null) ||
+        (cargo.toLowerCase().includes('recruta') ? guild.roles.cache.get('1536304132980473896') : null) ||
+        guild.roles.cache.find(r => 
+          (roleIdConfig && r.id === roleIdConfig) ||
+          r.name.toUpperCase().includes(cargo.toUpperCase()) || 
+          cargo.toUpperCase().includes(r.name.toUpperCase()) ||
+          (cargo.toLowerCase().includes('recruta') && r.name.toUpperCase().includes('RECRUTA'))
+        );
 
       if (discordRole) {
         try {
           await member.roles.add(discordRole);
+          roleStatus = '✅ Cargo ' + discordRole.name + ' atribuído com sucesso';
         } catch (e) {
-          roleStatus = '⚠️ Erro ao adicionar cargo';
+          roleStatus = '⚠️ Erro ao adicionar cargo ' + discordRole.name + ' (Verifique hierarquia do bot)';
         }
       } else {
-        roleStatus = '⚠️ Cargo não encontrado no servidor';
+        roleStatus = '⚠️ Cargo ' + cargo + ' (ID: ' + (roleIdConfig || '1536304132980473896') + ') não encontrado no servidor';
       }
 
       const embed = new EmbedBuilder()
