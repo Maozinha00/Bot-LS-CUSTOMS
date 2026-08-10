@@ -30,8 +30,10 @@ const client = new Client({
 // Banco de dados em memória para registrar horários de bate-ponto (/ponto)
 const pontosAtivos = new Map();
 
-// ID do Canal de Logs para Aprovação de Registro
+// ID dos Canais Oficiais de Logs e Painéis
 const LOGS_CHANNEL_ID = '1536173247312302150';
+const PONTO_CHANNEL_ID = '1536100212828020816';
+const DEMISSAO_CHANNEL_ID = '1536100214371389503';
 
 // 📜 REGISTRO DOS COMANDOS SLASH
 const commands = [
@@ -42,6 +44,20 @@ const commands = [
   new SlashCommandBuilder()
     .setName('painelponto')
     .setDescription('Envia o Painel Fixado de Bate-Ponto Interativo no canal'),
+
+  new SlashCommandBuilder()
+    .setName('paineldemissao')
+    .setDescription('Envia o Painel Fixado de Demissão da Liderança'),
+
+  new SlashCommandBuilder()
+    .setName('demitir')
+    .setDescription('Demitir integrante, remover cargos e expulsar do Discord')
+    .addUserOption(option => 
+      option.setName('membro').setDescription('Membro a ser demitido').setRequired(true))
+    .addStringOption(option => 
+      option.setName('motivo').setDescription('Motivo da demissão').setRequired(true))
+    .addStringOption(option => 
+      option.setName('passaporte').setDescription('Passaporte/ID do membro').setRequired(false)),
 
   new SlashCommandBuilder()
     .setName('registrar')
@@ -159,6 +175,103 @@ client.on('interactionCreate', async interaction => {
       );
 
       return await interaction.showModal(modal);
+    }
+
+    // 🚪 CLIQUE NO BOTÃO "PROCESSAR DEMISSÃO" (Painel de Demissão)
+    if (interaction.isButton() && interaction.customId === 'btn_solicitar_demissao') {
+      const modal = new ModalBuilder()
+        .setCustomId('modal_demissao')
+        .setTitle('Processar Demissão — LS CUSTOMS');
+
+      const userOrIdInput = new TextInputBuilder()
+        .setCustomId('dem_membro')
+        .setLabel('ID Discord do Membro (Ex: 1234567890)')
+        .setPlaceholder('Ex: 8492049201948201')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      const passaporteInput = new TextInputBuilder()
+        .setCustomId('dem_passaporte')
+        .setLabel('Passaporte / ID In-Game')
+        .setPlaceholder('Ex: 1234')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false);
+
+      const motivoInput = new TextInputBuilder()
+        .setCustomId('dem_motivo')
+        .setLabel('Motivo da Demissão')
+        .setPlaceholder('Ex: Inatividade / Desrespeito')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(userOrIdInput),
+        new ActionRowBuilder().addComponents(passaporteInput),
+        new ActionRowBuilder().addComponents(motivoInput)
+      );
+
+      return await interaction.showModal(modal);
+    }
+
+    // 🚪 SUBMIT DO FORMULÁRIO DE DEMISSÃO
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_demissao') {
+      const targetUserId = interaction.fields.getTextInputValue('dem_membro').trim();
+      const passaporte = interaction.fields.getTextInputValue('dem_passaporte') || 'N/A';
+      const motivo = interaction.fields.getTextInputValue('dem_motivo');
+
+      const guild = interaction.guild;
+      const staffUser = interaction.user;
+
+      let statusMsg = '✅ Cargos removidos e membro expulso do Discord';
+
+      try {
+        const member = await guild.members.fetch(targetUserId).catch(() => null);
+        if (member) {
+          const rolesToRemove = member.roles.cache.filter(r => r.name !== '@everyone');
+          if (rolesToRemove.size > 0) {
+            await member.roles.remove(rolesToRemove).catch(() => {});
+          }
+
+          if (member.kickable) {
+            await member.kick('Demissão efetuada por ' + staffUser.tag + ': ' + motivo).catch(() => {
+              statusMsg = '⚠️ Cargos removidos, mas erro ao expulsar do Discord (Permissão insuficiente)';
+            });
+          } else {
+            statusMsg = '⚠️ Cargos removidos, mas membro não pode ser expulso (Cargo do Bot é menor)';
+          }
+        } else {
+          statusMsg = '⚠️ Membro não encontrado no servidor, log registrado';
+        }
+      } catch (err) {
+        statusMsg = '⚠️ Erro ao processar expulsão no Discord';
+      }
+
+      try {
+        const demChannel = await guild.channels.fetch(DEMISSAO_CHANNEL_ID).catch(() => null) || interaction.channel;
+        const demEmbed = new EmbedBuilder()
+          .setTitle('🔴 LS CUSTOMS — REGISTRO DE DEMISSÃO')
+          .setDescription(
+            "🚨 **INTEGRANTE DEMITIDO E REMOVIDO DO DISCORD**\n\n" +
+            "👤 **MEMBRO DEMITIDO**: <@" + targetUserId + "> (" + targetUserId + ")\n" +
+            "🆔 **PASSAPORTE**: #" + passaporte + "\n" +
+            "👑 **DEMITIDO POR**: <@" + staffUser.id + ">\n" +
+            "📝 **MOTIVO**: " + motivo + "\n" +
+            "🚪 **AÇÃO EXECUTADA**: " + statusMsg + "\n\n" +
+            "📌 *Membro desvinculado oficialmente da equipe da LS CUSTOMS.*"
+          )
+          .setColor('#e74c3c')
+          .setFooter({ text: 'Painel de Demissão • LS CUSTOMS' })
+          .setTimestamp();
+
+        if (demChannel) {
+          await demChannel.send({ embeds: [demEmbed] });
+        }
+      } catch (err) {}
+
+      return interaction.reply({
+        content: "🚨 **Demissão processada com sucesso!**\nLog publicado no canal de demissão (ID: `" + DEMISSAO_CHANNEL_ID + "`).",
+        ephemeral: true
+      });
     }
 
     // 2️⃣ PROCESSAMENTO DO FORMULÁRIO DE RECRUTA ENVIADO -> ENVIA PARA CANAL DE LOGS PARA APROVAÇÃO
@@ -356,6 +469,28 @@ client.on('interactionCreate', async interaction => {
           .setFooter({ text: 'Sistema de Bate-Ponto • LS CUSTOMS' })
           .setTimestamp();
 
+        // Envia notificação no canal exclusivo de Entrada em Bate-Ponto (1536100212828020816)
+        try {
+          const pontoChannel = await interaction.guild.channels.fetch(PONTO_CHANNEL_ID).catch(() => null);
+          if (pontoChannel) {
+            const entryLogEmbed = new EmbedBuilder()
+              .setTitle('🟢 LS CUSTOMS — REGISTRO DE ENTRADA EM SERVIÇO')
+              .setDescription(
+                "👤 **Mecânico**: <@" + userId + "> (" + interaction.user.tag + ")\n" +
+                "⏰ **Horário de Entrada**: `" + now.toLocaleTimeString('pt-BR') + "`\n" +
+                "📻 **Frequência da Rádio**: **633**\n\n" +
+                "📌 *Mecânico iniciou o expediente e está ativo na oficina!*"
+              )
+              .setColor('#2ecc71')
+              .setFooter({ text: 'Log de Entrada • LS CUSTOMS' })
+              .setTimestamp();
+
+            await pontoChannel.send({ embeds: [entryLogEmbed] });
+          }
+        } catch (err) {
+          console.error('Erro ao enviar log no canal de bate-ponto:', err);
+        }
+
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -497,6 +632,88 @@ client.on('interactionCreate', async interaction => {
       );
 
       return interaction.reply({ embeds: [embed], components: [row] });
+    }
+
+    // 🚪 COMANDO /paineldemissao
+    if (commandName === 'paineldemissao') {
+      const embed = new EmbedBuilder()
+        .setTitle('🚪 LS CUSTOMS — PAINEL DE DEMISSÃO')
+        .setDescription(
+          "🚨 **PAINEL DE DESVINCULAÇÃO E DEMISSÃO DA LIDERANÇA**\n" +
+          "*Acesso restrito para Gerência e Liderança da LS CUSTOMS.*\n\n" +
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+          "⚠️ **Ao processar a demissão de um integrante:**\n" +
+          "• Todos os cargos na oficina serão automaticamente removidos\n" +
+          "• O integrante será expulso do servidor do Discord\n" +
+          "• O registro de demissão será enviado para este canal (ID: `" + DEMISSAO_CHANNEL_ID + "`)\n\n" +
+          "👉 **Clique no botão abaixo para iniciar o processo de demissão:**"
+        )
+        .setColor('#e74c3c')
+        .setFooter({ text: 'Painel Fixo de Demissão • LS CUSTOMS' });
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('btn_solicitar_demissao')
+          .setLabel('🚨 Processar Demissão')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      return interaction.reply({ embeds: [embed], components: [row] });
+    }
+
+    // 🚪 COMANDO /demitir
+    if (commandName === 'demitir') {
+      const targetUser = options.getUser('membro');
+      const motivo = options.getString('motivo');
+      const passaporte = options.getString('passaporte') || 'N/A';
+      const staffUser = user;
+
+      const member = await guild.members.fetch(targetUser.id).catch(() => null);
+      let statusMsg = '✅ Cargos removidos e membro expulso do Discord';
+
+      if (member) {
+        const rolesToRemove = member.roles.cache.filter(r => r.name !== '@everyone');
+        if (rolesToRemove.size > 0) {
+          await member.roles.remove(rolesToRemove).catch(() => {});
+        }
+
+        if (member.kickable) {
+          await member.kick('Demissão efetuada por ' + staffUser.tag + ': ' + motivo).catch(() => {
+            statusMsg = '⚠️ Cargos removidos, erro ao expulsar do Discord (Permissão insuficiente)';
+          });
+        } else {
+          statusMsg = '⚠️ Cargos removidos, membro tem cargo superior ao Bot';
+        }
+      } else {
+        statusMsg = '⚠️ Membro não encontrado no servidor, log de demissão publicado';
+      }
+
+      try {
+        const demChannel = await guild.channels.fetch(DEMISSAO_CHANNEL_ID).catch(() => null) || interaction.channel;
+        const demEmbed = new EmbedBuilder()
+          .setTitle('🔴 LS CUSTOMS — REGISTRO DE DEMISSÃO')
+          .setDescription(
+            "🚨 **INTEGRANTE DEMITIDO E REMOVIDO DO DISCORD**\n\n" +
+            "👤 **MEMBRO DEMITIDO**: <@" + targetUser.id + "> (" + targetUser.tag + ")\n" +
+            "🆔 **PASSAPORTE**: #" + passaporte + "\n" +
+            "👑 **DEMITIDO POR**: <@" + staffUser.id + ">\n" +
+            "📝 **MOTIVO**: " + motivo + "\n" +
+            "🚪 **AÇÃO EXECUTADA**: " + statusMsg + "\n\n" +
+            "📌 *Membro desvinculado oficialmente da equipe da LS CUSTOMS.*"
+          )
+          .setColor('#e74c3c')
+          .setFooter({ text: 'Registro de Demissão • LS CUSTOMS' })
+          .setTimestamp();
+
+        if (demChannel) {
+          await demChannel.send({ embeds: [demEmbed] });
+        }
+      } catch (err) {}
+
+      return interaction.reply({
+        content: "🚨 **Demissão concluída!** <@" + targetUser.id + "> foi removido do Discord e desvinculado da oficina. Log enviado ao canal (ID: `" + DEMISSAO_CHANNEL_ID + "`).",
+        ephemeral: true
+      });
     }
 
     // 📋 COMANDO /registrar
@@ -642,7 +859,7 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'tabela') {
       const embed = new EmbedBuilder()
         .setTitle('💰 TABELA DE PREÇOS — LS CUSTOMS')
-        .setDescription("**🛠️ REPAROS**\nReparo Geral: **R$ 5.000** | Kit de Reparo: **R$ 3.500** | Serviço de Reboque: **R$ 4.000**\n\n**🏎️ MOTOR**\nMotor Nível 1: **R$ 15.000** | Motor Nível 2: **R$ 30.000** | Motor Nível 3: **R$ 50.000** | Motor Nível 4 (Turbo): **R$ 80.000**\n\n**⚙️ FREIOS**\nFreios N1: **R$ 8.000** | Freios N2: **R$ 18.000** | Freios N3 (Esportivo): **R$ 32.000**\n\n**🔩 SUSPENSÃO**\nSuspensão N1: **R$ 10.000** | Suspensão Ar / Hidráulica: **R$ 40.000**\n\n**🎨 PINTURA**\nPintura Primária: **R$ 7.000** | Pintura Secundária: **R$ 5.000**")
+        .setDescription("**🛠️ ITENS**\nKit de Reparo Básico: **R$ 1.000** | Kit de Reparo Avançado: **R$ 2.500** | Chave Inglesa: **R$ 2.000** | Pneu: **R$ 500**\n\n**🚗 PERSONALIZAÇÃO**\nSaias Laterais: **R$ 2.000** | Parachoque Dianteiro: **R$ 2.000** | Parachoque Traseiro: **R$ 2.000** | Buzina: **R$ 1.500** | Capô: **R$ 2.000** | Escapamento: **R$ 2.000** | Xenon: **R$ 3.500** | Paralamas: **R$ 2.000** | Placa: **R$ 1.500** | Carroceria: **R$ 2.000** | Aerofólio: **R$ 2.000**\n\n**✨ COSMÉTICOS VEÍCULOS**\nBancos: **R$ 2.000** | Pinturas Extras: **R$ 2.000** | Fumaça Do Pneu: **R$ 2.500** | Cor Dos Faróis: **R$ 1.500** | Neon: **R$ 2.500** | Insufilm: **R$ 1.500** | Som: **R$ 2.000** | Volantes: **R$ 2.000** | Rodas: **R$ 5.000**\n\n**⚙️ FREIOS**\nNível 1: **R$ 10.000** | Nível 2: **R$ 15.000** | Nível 3: **R$ 18.000**\n\n**🏁 MOTOR**\nNível 1: **R$ 12.000** | Nível 2: **R$ 18.000** | Nível 3: **R$ 22.000** | Turbo: **R$ 15.000**\n\n**🔩 SUSPENSÃO**\nNível 1: **R$ 10.000** | Nível 2: **R$ 14.000** | Nível 3: **R$ 18.000** | Nível 4: **R$ 22.000**\n\n**⚡ TRANSMISSÃO**\nNível 1: **R$ 12.000** | Nível 2: **R$ 18.000** | Nível 3: **R$ 22.000**\n\n**🎨 PINTURA**\nCor Primária: **R$ 1.500** | Cor Secundária: **R$ 1.500** | Cor Camaleão: **R$ 2.500** | Cor da Roda: **R$ 1.000**")
         .setColor('#f1c40f')
         .setFooter({ text: 'Tabela Sujeita a Alterações Sem Aviso Prévio' })
         .setTimestamp();
