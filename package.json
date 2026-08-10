@@ -2,9 +2,9 @@
   "name": "ls-customs-bot",
   "version": "1.0.0",
   "description": "Bot Oficial Discord LS CUSTOMS FiveM",
-  "main": "ls_customs_bot.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node ls_customs_bot.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.18.0",
