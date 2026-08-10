@@ -10,7 +10,7 @@ try {
   // Ignora erro do dotenv se rodando diretamente
 }
 
-const { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 
 // 🔑 CONFIGURAÇÃO DO TOKEN E SERVIDOR
 // Se você preencheu o Token diretamente, ele usará. Senão, pegará das Variáveis de Ambiente do Railway.
@@ -33,6 +33,10 @@ const pontosAtivos = new Map();
 // 📜 REGISTRO DOS COMANDOS SLASH
 const commands = [
   new SlashCommandBuilder()
+    .setName('painelregistro')
+    .setDescription('Envia o painel fixo com botão para os membros solicitarem registro'),
+
+  new SlashCommandBuilder()
     .setName('registrar')
     .setDescription('Registra um novo integrante na LS CUSTOMS (Altera Nick e Atribui Cargo)')
     .addUserOption(option => 
@@ -46,6 +50,7 @@ const commands = [
         .addChoices(
           { name: '👑 LÍDER', value: '👑 LÍDER' },
           { name: '⭐ VICE-LÍDER', value: '⭐ VICE-LÍDER' },
+          { name: '🛠️ GERENTE', value: '🛠️ GERENTE' },
           { name: '🔧 MEMBRO', value: '🔧 MEMBRO' },
           { name: '🔰 RECRUTA', value: '🔰 RECRUTA' }
         )),
@@ -118,13 +123,147 @@ client.once('ready', async () => {
   }
 });
 
-// ⚡ GERENCIADOR DE INTERAÇÕES (COMANDOS SLASH)
+// ⚡ GERENCIADOR DE INTERAÇÕES (COMANDOS SLASH, BOTÕES E MODAIS)
 client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-
-  const { commandName, options, user, guild } = interaction;
-
   try {
+    // 1️⃣ CLIQUE NO BOTÃO "SOLICITAR SET DE RECRUTA"
+    if (interaction.isButton() && interaction.customId === 'btn_solicitar_registro') {
+      const modal = new ModalBuilder()
+        .setCustomId('modal_registro')
+        .setTitle('Set de Recruta — LS CUSTOMS');
+
+      const nomeInput = new TextInputBuilder()
+        .setCustomId('reg_nome')
+        .setLabel('Nome e Sobrenome In-Game')
+        .setPlaceholder('Ex: João Silva')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      const passaporteInput = new TextInputBuilder()
+        .setCustomId('reg_passaporte')
+        .setLabel('Passaporte / ID In-Game')
+        .setPlaceholder('Ex: 1234')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(nomeInput),
+        new ActionRowBuilder().addComponents(passaporteInput)
+      );
+
+      return await interaction.showModal(modal);
+    }
+
+    // 2️⃣ PROCESSAMENTO DO FORMULÁRIO DE RECRUTA ENVIADO
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
+      const nome = interaction.fields.getTextInputValue('reg_nome');
+      const passaporte = interaction.fields.getTextInputValue('reg_passaporte');
+
+      const member = interaction.member;
+      const guild = interaction.guild;
+
+      // Localiza o cargo de Recruta/Novato na lista de cargos configurados
+      const roleObj = [{"name":"👑 LÍDER","tag":"Líder","color":"#f1c40f"},{"name":"⭐ VICE-LÍDER","tag":"Vice-Líder","color":"#e67e22"},{"name":"🛠️ GERENTE","tag":"Gerente","color":"#1abc9c"},{"name":"🔧 MEMBRO","tag":"Membro","color":"#3498db"},{"name":"🔰 RECRUTA","tag":"Recruta","color":"#95a5a6"}].find(r => 
+        r.name.toLowerCase().includes('recruta') || 
+        r.name.toLowerCase().includes('novato') || 
+        r.tag.toLowerCase().includes('rec')
+      ) || [{"name":"👑 LÍDER","tag":"Líder","color":"#f1c40f"},{"name":"⭐ VICE-LÍDER","tag":"Vice-Líder","color":"#e67e22"},{"name":"🛠️ GERENTE","tag":"Gerente","color":"#1abc9c"},{"name":"🔧 MEMBRO","tag":"Membro","color":"#3498db"},{"name":"🔰 RECRUTA","tag":"Recruta","color":"#95a5a6"}][4] || { name: 'Recruta', tag: 'REC' };
+
+      const tagCargo = roleObj.tag || 'REC';
+      const cargoNomeFinal = roleObj.name || 'Recruta';
+      const novoNick = ("[" + tagCargo + "] " + nome + " | #" + passaporte).substring(0, 32);
+
+      let nickStatus = '✅ Alterado com sucesso';
+      let roleStatus = '✅ Cargo atribuído';
+
+      if (member && member.manageable) {
+        try {
+          await member.setNickname(novoNick);
+        } catch (e) {
+          nickStatus = '⚠️ Erro ao alterar (cargo do Bot precisa estar acima do usuário)';
+        }
+      } else {
+        nickStatus = '⚠️ Não foi possível alterar (Usuário é Dono do Servidor ou tem cargo maior)';
+      }
+
+      const discordRole = guild ? guild.roles.cache.find(r => 
+        r.name.toUpperCase().includes(cargoNomeFinal.toUpperCase()) || 
+        cargoNomeFinal.toUpperCase().includes(r.name.toUpperCase())
+      ) : null;
+
+      if (discordRole && member) {
+        try {
+          await member.roles.add(discordRole);
+        } catch (e) {
+          roleStatus = '⚠️ Erro ao adicionar cargo (verifique hierarquia de cargos)';
+        }
+      } else {
+        roleStatus = '⚠️ Cargo ' + cargoNomeFinal + ' não foi encontrado no servidor';
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle('📋 SET DE RECRUTA CONCEDIDO — LS CUSTOMS')
+        .setDescription(
+          "> **Novo Recruta registrado com sucesso!**\n\n" +
+          "👤 **NOME**: " + nome + "\n" +
+          "🆔 **PASSAPORTE**: #" + passaporte + "\n" +
+          "🔰 **CARGO**: " + cargoNomeFinal + "\n" +
+          "🎮 **USUÁRIO**: <@" + interaction.user.id + ">\n" +
+          "🏷️ **NICK DEFINIDO**: `" + novoNick + "`\n\n" +
+          "⚙️ **Status Apelido**: " + nickStatus + "\n" +
+          "⚙️ **Status Cargo**: " + roleStatus
+        )
+        .setColor('#2ecc71')
+        .setFooter({ text: 'Bot Oficial • LS CUSTOMS' })
+        .setTimestamp();
+
+      await interaction.reply({
+        content: "✅ Seu **Set de Recruta** na **LS CUSTOMS** foi processado com sucesso!",
+        embeds: [embed],
+        ephemeral: true
+      });
+
+      // Envia notificação no canal público de registro
+      try {
+        await interaction.channel.send({
+          content: "🎉 Novo Recruta na equipe: <@" + interaction.user.id + "> -> `" + novoNick + "` (" + cargoNomeFinal + ")"
+        });
+      } catch (e) {}
+
+      return;
+    }
+
+    // 3️⃣ COMANDOS SLASH
+    if (!interaction.isChatInputCommand()) return;
+
+    const { commandName, options, user, guild } = interaction;
+
+    // 📋 COMANDO /painelregistro
+    if (commandName === 'painelregistro') {
+      const embed = new EmbedBuilder()
+        .setTitle('📋 PAINEL DE REGISTRO — LS CUSTOMS')
+        .setDescription(
+          "🚨 **SEJA BEM-VINDO À LS CUSTOMS!**\n\n" +
+          "Para solicitar seu **Set de Recruta** e entrar na equipe, clique no botão abaixo:\n\n" +
+          "👉 **[ 📋 Solicitar Set de Recruta ]**\n\n" +
+          "📌 **Ao clicar, informe:**\n" +
+          "1️⃣ Nome e Sobrenome In-Game\n" +
+          "2️⃣ Passaporte / ID In-Game\n\n" +
+          "⚙️ *O Bot alterará seu apelido para `[REC] Nome | #ID` e concederá o cargo de Recruta automaticamente!*"
+        )
+        .setColor('#2ecc71')
+        .setFooter({ text: 'Sistema de Registro Automático • LS CUSTOMS' });
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('btn_solicitar_registro')
+          .setLabel('📋 Solicitar Set de Recruta')
+          .setStyle(ButtonStyle.Primary)
+      );
+
+      return interaction.reply({ embeds: [embed], components: [row] });
+    }
+
     // 📋 COMANDO /registrar
     if (commandName === 'registrar') {
       const targetUser = options.getUser('membro');
@@ -138,7 +277,7 @@ client.on('interactionCreate', async interaction => {
       }
 
       // Encontra a tag resumida do cargo
-      const roleObj = [{"name":"👑 LÍDER","tag":"Líder","color":"#f1c40f"},{"name":"⭐ VICE-LÍDER","tag":"Vice-Líder","color":"#e67e22"},{"name":"🔧 MEMBRO","tag":"Membro","color":"#3498db"},{"name":"🔰 RECRUTA","tag":"Recruta","color":"#95a5a6"}].find(r => r.name === cargo);
+      const roleObj = [{"name":"👑 LÍDER","tag":"Líder","color":"#f1c40f"},{"name":"⭐ VICE-LÍDER","tag":"Vice-Líder","color":"#e67e22"},{"name":"🛠️ GERENTE","tag":"Gerente","color":"#1abc9c"},{"name":"🔧 MEMBRO","tag":"Membro","color":"#3498db"},{"name":"🔰 RECRUTA","tag":"Recruta","color":"#95a5a6"}].find(r => r.name === cargo);
       const tagCargo = roleObj ? roleObj.tag : 'Membro';
       const novoNick = ("[" + tagCargo + "] " + nome + " | #" + passaporte).substring(0, 32);
 
