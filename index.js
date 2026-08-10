@@ -30,6 +30,9 @@ const client = new Client({
 // Banco de dados em memória para registrar horários de bate-ponto (/ponto)
 const pontosAtivos = new Map();
 
+// ID do Canal de Logs para Aprovação de Registro
+const LOGS_CHANNEL_ID = '1536173247312302150';
+
 // 📜 REGISTRO DOS COMANDOS SLASH
 const commands = [
   new SlashCommandBuilder()
@@ -154,13 +157,10 @@ client.on('interactionCreate', async interaction => {
       return await interaction.showModal(modal);
     }
 
-    // 2️⃣ PROCESSAMENTO DO FORMULÁRIO DE RECRUTA ENVIADO
+    // 2️⃣ PROCESSAMENTO DO FORMULÁRIO DE RECRUTA ENVIADO -> ENVIA PARA CANAL DE LOGS PARA APROVAÇÃO
     if (interaction.isModalSubmit() && interaction.customId === 'modal_registro') {
       const nome = interaction.fields.getTextInputValue('reg_nome');
       const passaporte = interaction.fields.getTextInputValue('reg_passaporte');
-
-      const member = interaction.member;
-      const guild = interaction.guild;
 
       // Localiza o cargo de Recruta/Novato na lista de cargos configurados
       const roleObj = [{"name":"👑 LÍDER","tag":"Líder","color":"#f1c40f"},{"name":"⭐ VICE-LÍDER","tag":"Vice-Líder","color":"#e67e22"},{"name":"🛠️ GERENTE","tag":"Gerente","color":"#1abc9c"},{"name":"🔧 MEMBRO","tag":"Membro","color":"#3498db"},{"name":"🔰 RECRUTA","tag":"Recruta","color":"#95a5a6"}].find(r => 
@@ -173,62 +173,149 @@ client.on('interactionCreate', async interaction => {
       const cargoNomeFinal = roleObj.name || 'Recruta';
       const novoNick = ("[" + tagCargo + "] " + nome + " | #" + passaporte).substring(0, 32);
 
-      let nickStatus = '✅ Alterado com sucesso';
-      let roleStatus = '✅ Cargo atribuído';
-
-      if (member && member.manageable) {
-        try {
-          await member.setNickname(novoNick);
-        } catch (e) {
-          nickStatus = '⚠️ Erro ao alterar (cargo do Bot precisa estar acima do usuário)';
-        }
-      } else {
-        nickStatus = '⚠️ Não foi possível alterar (Usuário é Dono do Servidor ou tem cargo maior)';
-      }
-
-      const discordRole = guild ? guild.roles.cache.find(r => 
-        r.name.toUpperCase().includes(cargoNomeFinal.toUpperCase()) || 
-        cargoNomeFinal.toUpperCase().includes(r.name.toUpperCase())
-      ) : null;
-
-      if (discordRole && member) {
-        try {
-          await member.roles.add(discordRole);
-        } catch (e) {
-          roleStatus = '⚠️ Erro ao adicionar cargo (verifique hierarquia de cargos)';
-        }
-      } else {
-        roleStatus = '⚠️ Cargo ' + cargoNomeFinal + ' não foi encontrado no servidor';
-      }
-
-      const embed = new EmbedBuilder()
-        .setTitle('📋 SET DE RECRUTA CONCEDIDO — LS CUSTOMS')
-        .setDescription(
-          "> **Novo Recruta registrado com sucesso!**\n\n" +
-          "👤 **NOME**: " + nome + "\n" +
-          "🆔 **PASSAPORTE**: #" + passaporte + "\n" +
-          "🔰 **CARGO**: " + cargoNomeFinal + "\n" +
-          "🎮 **USUÁRIO**: <@" + interaction.user.id + ">\n" +
-          "🏷️ **NICK DEFINIDO**: `" + novoNick + "`\n\n" +
-          "⚙️ **Status Apelido**: " + nickStatus + "\n" +
-          "⚙️ **Status Cargo**: " + roleStatus
-        )
-        .setColor('#2ecc71')
-        .setFooter({ text: 'Bot Oficial • LS CUSTOMS' })
-        .setTimestamp();
-
+      // Responde ao usuário ephemeral
       await interaction.reply({
-        content: "✅ Seu **Set de Recruta** na **LS CUSTOMS** foi processado com sucesso!",
-        embeds: [embed],
+        content: "⏳ **Solicitação de Set de Recruta enviada com sucesso!**\nSua solicitação foi encaminhada para a liderança da **LS CUSTOMS** no canal de logs (ID: `" + LOGS_CHANNEL_ID + "`). Aguarde a aprovação!",
         ephemeral: true
       });
 
-      // Envia notificação no canal público de registro
+      // Tenta enviar o log de aprovação para o canal de logs
       try {
-        await interaction.channel.send({
-          content: "🎉 Novo Recruta na equipe: <@" + interaction.user.id + "> -> `" + novoNick + "` (" + cargoNomeFinal + ")"
-        });
-      } catch (e) {}
+        const logsChannel = await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null) || interaction.channel;
+
+        const logEmbed = new EmbedBuilder()
+          .setTitle('📋 NOVA SOLICITAÇÃO DE SET DE RECRUTA — LS CUSTOMS')
+          .setDescription(
+            "📌 **SOLICITAÇÃO PENDENTE DE APROVAÇÃO DA LIDERANÇA**\n\n" +
+            "👤 **NOME IN-GAME**: " + nome + "\n" +
+            "🆔 **PASSAPORTE**: #" + passaporte + "\n" +
+            "🔰 **CARGO SOLICITADO**: " + cargoNomeFinal + "\n" +
+            "🎮 **USUÁRIO DISCORD**: <@" + interaction.user.id + "> (" + interaction.user.tag + ")\n" +
+            "🏷️ **NOVO NICK SUGERIDO**: `" + novoNick + "`\n\n" +
+            "⚙️ **STATUS**: ⏳ **Aguardando Análise da Liderança...**"
+          )
+          .setColor('#f1c40f')
+          .setFooter({ text: 'Sistema de Registro & Logs • LS CUSTOMS' })
+          .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('btn_aprovar_' + interaction.user.id + '_' + encodeURIComponent(nome) + '_' + passaporte)
+            .setLabel('✅ Aprovar Set')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId('btn_recusar_' + interaction.user.id)
+            .setLabel('❌ Recusar Set')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+        if (logsChannel) {
+          await logsChannel.send({ embeds: [logEmbed], components: [row] });
+        }
+      } catch (err) {
+        console.error('Erro ao enviar log de registro:', err);
+      }
+
+      return;
+    }
+
+    // 3️⃣ CLIQUE NOS BOTÕES DE APROVAÇÃO / RECUSA NO CANAL DE LOGS
+    if (interaction.isButton() && (interaction.customId.startsWith('btn_aprovar_') || interaction.customId.startsWith('btn_recusar_'))) {
+      const isApprove = interaction.customId.startsWith('btn_aprovar_');
+      const parts = interaction.customId.split('_');
+      const targetUserId = parts[2];
+
+      const guild = interaction.guild;
+      const staffUser = interaction.user;
+
+      if (isApprove) {
+        const nome = decodeURIComponent(parts[3] || '');
+        const passaporte = parts[4] || '';
+
+        const roleObj = [{"name":"👑 LÍDER","tag":"Líder","color":"#f1c40f"},{"name":"⭐ VICE-LÍDER","tag":"Vice-Líder","color":"#e67e22"},{"name":"🛠️ GERENTE","tag":"Gerente","color":"#1abc9c"},{"name":"🔧 MEMBRO","tag":"Membro","color":"#3498db"},{"name":"🔰 RECRUTA","tag":"Recruta","color":"#95a5a6"}].find(r => 
+          r.name.toLowerCase().includes('recruta') || 
+          r.name.toLowerCase().includes('novato') || 
+          r.tag.toLowerCase().includes('rec')
+        ) || [{"name":"👑 LÍDER","tag":"Líder","color":"#f1c40f"},{"name":"⭐ VICE-LÍDER","tag":"Vice-Líder","color":"#e67e22"},{"name":"🛠️ GERENTE","tag":"Gerente","color":"#1abc9c"},{"name":"🔧 MEMBRO","tag":"Membro","color":"#3498db"},{"name":"🔰 RECRUTA","tag":"Recruta","color":"#95a5a6"}][4] || { name: 'Recruta', tag: 'REC' };
+
+        const tagCargo = roleObj.tag || 'REC';
+        const cargoNomeFinal = roleObj.name || 'Recruta';
+        const novoNick = ("[" + tagCargo + "] " + nome + " | #" + passaporte).substring(0, 32);
+
+        let nickStatus = '✅ Alterado com sucesso';
+        let roleStatus = '✅ Cargo atribuído';
+
+        try {
+          const targetMember = await guild.members.fetch(targetUserId).catch(() => null);
+          if (targetMember) {
+            if (targetMember.manageable) {
+              await targetMember.setNickname(novoNick).catch(() => { nickStatus = '⚠️ Erro ao alterar apelido'; });
+            } else {
+              nickStatus = '⚠️ Não foi possível alterar nick (Cargo do bot menor)';
+            }
+
+            const discordRole = guild.roles.cache.find(r => 
+              r.name.toUpperCase().includes(cargoNomeFinal.toUpperCase()) || 
+              cargoNomeFinal.toUpperCase().includes(r.name.toUpperCase())
+            );
+
+            if (discordRole) {
+              await targetMember.roles.add(discordRole).catch(() => { roleStatus = '⚠️ Erro ao adicionar cargo'; });
+            } else {
+              roleStatus = '⚠️ Cargo ' + cargoNomeFinal + ' não encontrado no servidor';
+            }
+          }
+        } catch (e) {}
+
+        const approvedEmbed = new EmbedBuilder()
+          .setTitle('✅ SET DE RECRUTA APROVADO — LS CUSTOMS')
+          .setDescription(
+            "🎉 **SOLICITAÇÃO APROVADA COM SUCESSO!**\n\n" +
+            "👤 **NOME**: " + nome + "\n" +
+            "🆔 **PASSAPORTE**: #" + passaporte + "\n" +
+            "🔰 **CARGO**: " + cargoNomeFinal + "\n" +
+            "🎮 **USUÁRIO**: <@" + targetUserId + ">\n" +
+            "🏷️ **NICK DEFINIDO**: `" + novoNick + "`\n\n" +
+            "👑 **APROVADO POR**: <@" + staffUser.id + ">\n" +
+            "⚙️ **Status Apelido**: " + nickStatus + "\n" +
+            "⚙️ **Status Cargo**: " + roleStatus
+          )
+          .setColor('#2ecc71')
+          .setFooter({ text: 'Sistema de Registro Automático • LS CUSTOMS' })
+          .setTimestamp();
+
+        const disabledRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('btn_approved_done').setLabel('✅ Aprovado por @' + staffUser.username).setStyle(ButtonStyle.Success).setDisabled(true)
+        );
+
+        await interaction.update({ embeds: [approvedEmbed], components: [disabledRow] });
+
+        // Tenta notificar no canal da interação
+        try {
+          await interaction.channel.send({
+            content: "🎉 **Set de Recruta Aprovado!** <@" + targetUserId + "> agora é um **" + cargoNomeFinal + "** da **LS CUSTOMS** (Nick: `" + novoNick + "`)!"
+          });
+        } catch (e) {}
+      } else {
+        // Recusado
+        const rejectedEmbed = new EmbedBuilder()
+          .setTitle('❌ SET DE RECRUTA RECUSADO — LS CUSTOMS')
+          .setDescription(
+            "❌ **SOLICITAÇÃO DE REGISTRO RECUSADA**\n\n" +
+            "🎮 **USUÁRIO**: <@" + targetUserId + ">\n" +
+            "👑 **RECUSADO POR**: <@" + staffUser.id + ">\n\n" +
+            "📌 *A solicitação foi indeferida pela liderança.*"
+          )
+          .setColor('#e74c3c')
+          .setFooter({ text: 'Sistema de Registro Automático • LS CUSTOMS' })
+          .setTimestamp();
+
+        const disabledRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('btn_rejected_done').setLabel('❌ Recusado por @' + staffUser.username).setStyle(ButtonStyle.Danger).setDisabled(true)
+        );
+
+        await interaction.update({ embeds: [rejectedEmbed], components: [disabledRow] });
+      }
 
       return;
     }
