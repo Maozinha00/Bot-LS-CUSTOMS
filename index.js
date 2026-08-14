@@ -29,6 +29,16 @@ const {
 } = require('discord.js');
 
 // ==========================================
+// 🛡️ ANTI-CRASH GLOBAL (Evita que o bot caia)
+// ==========================================
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️ [ANTI-CRASH] Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (error, origin) => {
+  console.error('⚠️ [ANTI-CRASH] Uncaught Exception:', error);
+});
+
+// ==========================================
 // 🔑 CONFIGURAÇÕES & IDS DA LS CUSTOMS
 // ==========================================
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN || 'SEU_DISCORD_BOT_TOKEN_AQUI';
@@ -39,7 +49,7 @@ const PREFIX = '!';
 const CONFIG_LS = {
   // Canais
   canalAdvId: process.env.CANAL_ADV_ID || '1536304172952191049',
-  canalLogsAdvId: process.env.CANAL_LOGS_ADV_ID || '1537900474995445852',
+  canalLogsAdvId: process.env.CANAL_LOGS_ADV_ID || '1536333810629607514',
   canalPainelAusenciaId: process.env.CANAL_PAINEL_AUSENCIA_ID || '1537852669853438032',
   canalLogsAusenciaId: process.env.CANAL_LOGS_AUSENCIA_ID || '1537852751726510181',
   canalLogsEntradaSaidaId: process.env.CANAL_LOGS_ENTRADA_SAIDA_ID || '1536304188105949244',
@@ -49,11 +59,11 @@ const CONFIG_LS = {
   canalAnunciosId: process.env.CANAL_ANUNCIOS_ID || '1536304188105949250',
 
   // Cargos
-  cargoLiderancaId: process.env.CARGO_LIDERANCA_ID || '1536304130367299604',
-  cargoMecanicoId: process.env.CARGO_MECANICO_ID || '1536304132191948831',
-  cargoRecrutaId: process.env.CARGO_RECRUTA_ID || '1536304132980473896',
-  cargoAusenteId: process.env.CARGO_AUSENTE_ID || '1537201812795555850',
-  cargoAdvVerbalLeveId: process.env.CARGO_ADV_LEVE_ID || '1536304133924200468',
+  cargoLiderancaId: process.env.CARGO_LIDERANCA_ID || '1536304128912003112',
+  cargoMecanicoId: process.env.CARGO_MECANICO_ID || '1536304130000000001',
+  cargoRecrutaId: process.env.CARGO_RECRUTA_ID || '1536304131000000002',
+  cargoAusenteId: process.env.CARGO_AUSENTE_ID || '1536304132000000003',
+  cargoAdvVerbalLeveId: process.env.CARGO_ADV_LEVE_ID || '1536526429897097246',
   cargoAdvMediaId: process.env.CARGO_ADV_MEDIA_ID || '1536304134746275861',
   cargoAdvGraveId: process.env.CARGO_ADV_GRAVE_ID || '1536304135517773834',
   cargoDemitidoId: process.env.CARGO_DEMITIDO_ID || '1536304136000000004',
@@ -220,10 +230,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('tabela')
     .setDescription('Exibe a Tabela Oficial de Preços e Serviços da LS Customs'),
-
-  new SlashCommandBuilder()
-    .setName('radio')
-    .setDescription('Exibe as Frequências de Rádio oficiais e Códigos de Comunicação'),
 
   new SlashCommandBuilder()
     .setName('demitir')
@@ -668,11 +674,6 @@ client.on(Events.MessageCreate, async (message) => {
     await message.channel.send({ embeds: [criarEmbedTabela()] });
   }
 
-  // 6. Frequências de Rádio
-  if (message.content === `${PREFIX}radio`) {
-    await message.channel.send({ embeds: [criarEmbedRadio()] });
-  }
-
   // 7. Ajuda
   if (message.content === `${PREFIX}ajuda`) {
     const embedAjuda = new EmbedBuilder()
@@ -693,8 +694,6 @@ client.on(Events.MessageCreate, async (message) => {
         `**Comandos Rápidos:**
 ` +
         `• ``${PREFIX}tabela`` ou ``/tabela`` — Tabela de preços de serviços
-` +
-        `• ``${PREFIX}radio`` ou ``/radio`` — Frequências de rádio e Códigos Q
 ` +
         `• ``/verificarvencidas`` — Checa ausências expiradas e pune automático
 ` +
@@ -790,10 +789,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply({ embeds: [criarEmbedTabela()] });
       }
 
-      if (commandName === 'radio') {
-        return interaction.reply({ embeds: [criarEmbedRadio()] });
-      }
-
       if (commandName === 'minhasadvs') {
         const userAdvs = db.advertencias[interaction.user.id];
         if (!userAdvs || userAdvs.pontos === 0) {
@@ -837,7 +832,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
             `• ``/painelausencia`` — Painel de ausências\n` +
             `• ``/painelponto`` — Painel de bate-ponto\n` +
             `• ``/tabela`` — Tabela de preços\n` +
-            `• ``/radio`` — Frequências de rádio\n` +
             `• ``/minhasadvs`` — Consulta suas advertências\n` +
             `• ``/verificarvencidas`` — Checa ausências\n` +
             `• ``/demitir`` — Exonera membro (Líder)`
@@ -1591,37 +1585,6 @@ function criarEmbedTabela() {
       }
     )
     .setImage(CONFIG_LS.bannerUrl)
-    .setFooter({ text: CONFIG_LS.rodape })
-    .setTimestamp();
-}
-
-function criarEmbedRadio() {
-  return new EmbedBuilder()
-    .setColor('#3B82F6')
-    .setTitle('📻 FREQUÊNCIAS DE RÁDIO & CÓDIGO Q — LS CUSTOMS')
-    .setDescription('Padronização de comunicação via rádio para todos os mecânicos em serviço.')
-    .addFields(
-      {
-        name: '📡 Frequências Oficiais',
-        value: 
-          '• **105.1 MHz** — Rádio Principal (Oficina e Atendimentos Gerais)\n' +
-          '• **105.2 MHz** — Rádio Pista / Guincho Externo e Resgate\n' +
-          '• **105.9 MHz** — Rádio Liderança e Reuniões Disciplinares\n' +
-          '• **100.0 MHz** — Frequência Geral Integrada',
-        inline: false
-      },
-      {
-        name: '🗣️ Códigos de Comunicação Mais Usados',
-        value: 
-          '• **QAP:** Na escuta / Pronto para receber transmissão\n' +
-          '• **QRV:** À disposição para atendimento / serviço\n' +
-          '• **QSL:** Entendido e confirmado\n' +
-          '• **QTH:** Localização atual do mecânico / veículo\n' +
-          '• **QTR:** Horário exato\n' +
-          '• **TKS:** Obrigado / Agradecido',
-        inline: false
-      }
-    )
     .setFooter({ text: CONFIG_LS.rodape })
     .setTimestamp();
 }
