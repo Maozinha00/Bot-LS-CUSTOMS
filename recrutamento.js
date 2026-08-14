@@ -1,4 +1,4 @@
-e/**
+/**
  * ============================================================================
  * 📝 LS CUSTOMS — SISTEMA DE RECRUTAMENTO & REGISTRO
  * ARQUIVO: recrutamento.js
