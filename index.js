@@ -97,6 +97,79 @@ const pontoRecords = new Map(); // memberId -> { lastPontoTime, isWorking }
 const tempRecruitment = new Map(); // userId -> { step1Data }
 
 // ==========================================
+// 🛡️ VALIDAÇÃO INTELIGENTE (ANTI-TROLL & RESPOSTAS SEM NOÇÃO)
+// ==========================================
+function validarCandidaturaSemNocao(dados) {
+  const { nome, passaporte, idade, experiencia, motivo, disponibilidade, aceitaRegras, situacaoConflito } = dados;
+
+  // 1. Validar Idade
+  if (idade !== undefined) {
+    const idadeNum = parseInt(idade.replace(/\D/g, ''));
+    if (isNaN(idadeNum) || idadeNum < 14 || idadeNum > 90) {
+      return { semNocao: true, motivo: `Idade "${idade}" é inválida ou sem noção (deve ser entre 14 e 90 anos).` };
+    }
+  }
+
+  // 2. Validar Passaporte
+  if (passaporte !== undefined) {
+    const passL = passaporte.trim().toLowerCase();
+    if (!passL || passL === '0' || passL === 'nenhum' || passL === 'sla' || passL === 'sei la' || passL === 'abc') {
+      return { semNocao: true, motivo: 'Passaporte/ID inválido ou em branco.' };
+    }
+  }
+
+  // 3. Validar Nome
+  if (nome !== undefined) {
+    const nomeL = nome.trim().toLowerCase();
+    const trollNomes = ['troll', 'zoeira', 'seu pai', 'sua mae', 'adm lixo', 'fodase', 'foda-se', 'asdf', 'teste123', 'qualquer'];
+    if (nomeL.length < 3 || trollNomes.some(t => nomeL.includes(t))) {
+      return { semNocao: true, motivo: 'Nome de personagem sem noção ou inadequado para RP.' };
+    }
+  }
+
+  // 4. Validar Regras
+  if (aceitaRegras !== undefined) {
+    const regrasL = aceitaRegras.trim().toLowerCase();
+    const recusaRegras = ['não', 'nao', 'nunca', 'discordo', 'nem ferrando', 'nem fudendo', 'lixo', 'odeio', 'não aceito', 'nao aceito', 'tanto faz'];
+    if (recusaRegras.includes(regrasL) || regrasL.startsWith('não') || regrasL.startsWith('nao')) {
+      return { semNocao: true, motivo: 'Recusa explícita das regras da mecânica e do ponto obrigatório.' };
+    }
+  }
+
+  // 5. Palavras-chave troll / agressivas / sem sentido
+  const trollTerms = [
+    'matar', 'roubar', 'trollar', 'zoar', 'bagunçar', 'dar tiro', 'bater nele', 'destruir',
+    'xingar', 'farpar', 'chutar', 'atirar', 'puxar arma', 'comi sua', 'foda-se', 'fodase',
+    'sla', 'sei la', 'sei la mano', 'fazer nada', 'sei nao', 'dsadsad', 'asdfgh', 'teste123',
+    'pq sim', 'porque sim', 'grana facil', 'farmar e vazar', 'pegar arma', 'atropelar',
+    'dar soco', 'mandar tomar', 'mandar se fuder', 'desrespeitar'
+  ];
+
+  if (motivo !== undefined) {
+    const motL = motivo.trim().toLowerCase();
+    if (motL.length < 6 || trollTerms.some(t => motL.includes(t))) {
+      return { semNocao: true, motivo: 'Motivo de entrada sem seriedade, agressivo ou insuficiente.' };
+    }
+  }
+
+  if (situacaoConflito !== undefined) {
+    const sitL = situacaoConflito.trim().toLowerCase();
+    if (sitL.length < 6 || trollTerms.some(t => sitL.includes(t))) {
+      return { semNocao: true, motivo: 'Conduta em conflitos inaceitável (postura agressiva, deboche ou desrespeito ao cliente).' };
+    }
+  }
+
+  if (experiencia !== undefined) {
+    const expL = experiencia.trim().toLowerCase();
+    if (expL.length < 2 || trollTerms.some(t => expL === t)) {
+      return { semNocao: true, motivo: 'Campo de experiência preenchido sem seriedade.' };
+    }
+  }
+
+  return { semNocao: false };
+}
+
+// ==========================================
 // 🌐 SERVIDOR WEB NATIVO PARA UPTIME 24/7
 // ==========================================
 const server = http.createServer((req, res) => {
@@ -521,6 +594,51 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
+    // BOTÃO: INICIAR RECRUTAMENTO (ETAPA 1)
+    if (interaction.customId === 'btn_iniciar_recrutamento') {
+      const modal = new ModalBuilder()
+        .setCustomId('modal_recrutamento_step1')
+        .setTitle('LS CUSTOMS — Recrutamento (1/2)');
+
+      const inputNome = new TextInputBuilder()
+        .setCustomId('rec_nome')
+        .setLabel('1. Nome Completo (Personagem)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Ex: Felipe Souza')
+        .setRequired(true);
+
+      const inputPassaporte = new TextInputBuilder()
+        .setCustomId('rec_passaporte')
+        .setLabel('2. Passaporte / ID na Cidade')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Ex: 4192')
+        .setRequired(true);
+
+      const inputIdade = new TextInputBuilder()
+        .setCustomId('rec_idade')
+        .setLabel('3. Idade')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Ex: 21')
+        .setRequired(true);
+
+      const inputExp = new TextInputBuilder()
+        .setCustomId('rec_exp')
+        .setLabel('4. Experiência como mecânico?')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Ex: 2 meses na Bennys / Nenhuma...')
+        .setRequired(true);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(inputNome),
+        new ActionRowBuilder().addComponents(inputPassaporte),
+        new ActionRowBuilder().addComponents(inputIdade),
+        new ActionRowBuilder().addComponents(inputExp)
+      );
+
+      await interaction.showModal(modal);
+      return;
+    }
+
     // BOTÃO: APROVAR RECRUTA
     if (interaction.customId.startsWith('aprovar_rec_')) {
       const userId = interaction.customId.replace('aprovar_rec_', '');
@@ -531,10 +649,174 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
       return;
     }
+
+    // BOTÃO: RECUSAR RECRUTA
+    if (interaction.customId.startsWith('recusar_rec_')) {
+      const userId = interaction.customId.replace('recusar_rec_', '');
+
+      await interaction.reply({
+        content: `❌ Candidatura de <@${userId}> foi recusada por <@${interaction.user.id}>.`,
+        ephemeral: false
+      });
+      return;
+    }
   }
 
   // 3. SUBMISSÃO DE MODAIS
   if (interaction.isModalSubmit()) {
+    // SUBMIT: RECRUTAMENTO ETAPA 1 (COM VALIDAÇÃO ANTI-SEM NOÇÃO)
+    if (interaction.customId === 'modal_recrutamento_step1') {
+      const nome = interaction.fields.getTextInputValue('rec_nome');
+      const passaporte = interaction.fields.getTextInputValue('rec_passaporte').replace('#', '');
+      const idade = interaction.fields.getTextInputValue('rec_idade');
+      const experiencia = interaction.fields.getTextInputValue('rec_exp');
+
+      const validacao1 = validarCandidaturaSemNocao({ nome, passaporte, idade, experiencia });
+      if (validacao1.semNocao) {
+        await interaction.reply({
+          content: `❌ **Candidatura Reprovada Automaticamente!**\n\nIdentificamos dados sem noção ou inválidos:\n⚠️ **${validacao1.motivo}**\n\nA LS Customs exige preenchimento sério no formulário.`,
+          ephemeral: true
+        });
+        return;
+      }
+
+      tempRecruitment.set(interaction.user.id, { nome, passaporte, idade, experiencia });
+
+      const modal2 = new ModalBuilder()
+        .setCustomId('modal_recrutamento_step2')
+        .setTitle('LS CUSTOMS — Recrutamento (2/2)');
+
+      const inputMotivo = new TextInputBuilder()
+        .setCustomId('rec_motivo')
+        .setLabel('5. Por que quer entrar na LS Customs?')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Ex: Gosto do RP de mecânico e busco oficina ativa...')
+        .setRequired(true);
+
+      const inputDisp = new TextInputBuilder()
+        .setCustomId('rec_disp')
+        .setLabel('6. Disponibilidade de horários')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Ex: Noite (19h às 00h)')
+        .setRequired(true);
+
+      const inputRegras = new TextInputBuilder()
+        .setCustomId('rec_regras')
+        .setLabel('7. Leu regras e aceita bater ponto?')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Ex: Sim, aceito todas as regras e ponto.')
+        .setRequired(true);
+
+      const inputConflito = new TextInputBuilder()
+        .setCustomId('rec_conflito')
+        .setLabel('8. Como lidaria com cliente estressado?')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Ex: Manter a calma, consultar tabela de preços e chamar um superior.')
+        .setRequired(true);
+
+      modal2.addComponents(
+        new ActionRowBuilder().addComponents(inputMotivo),
+        new ActionRowBuilder().addComponents(inputDisp),
+        new ActionRowBuilder().addComponents(inputRegras),
+        new ActionRowBuilder().addComponents(inputConflito)
+      );
+
+      await interaction.showModal(modal2);
+      return;
+    }
+
+    // SUBMIT: RECRUTAMENTO ETAPA 2 (FINAL - COM VALIDAÇÃO ANTI-SEM NOÇÃO)
+    if (interaction.customId === 'modal_recrutamento_step2') {
+      const step1 = tempRecruitment.get(interaction.user.id) || {};
+      const motivo = interaction.fields.getTextInputValue('rec_motivo');
+      const disponibilidade = interaction.fields.getTextInputValue('rec_disp');
+      const aceitaRegras = interaction.fields.getTextInputValue('rec_regras');
+      const situacaoConflito = interaction.fields.getTextInputValue('rec_conflito');
+
+      const validacao2 = validarCandidaturaSemNocao({
+        nome: step1.nome,
+        passaporte: step1.passaporte,
+        idade: step1.idade,
+        experiencia: step1.experiencia,
+        motivo,
+        disponibilidade,
+        aceitaRegras,
+        situacaoConflito
+      });
+
+      // Se for "sem noção" / troll, reprova na hora!
+      if (validacao2.semNocao) {
+        tempRecruitment.delete(interaction.user.id);
+
+        // Notifica no canal de logs da Staff sobre a tentativa troll
+        const canalLogs = client.channels.cache.get(CONFIG_LS.canalLogsRecrutamentoId);
+        if (canalLogs) {
+          const trollEmbed = new EmbedBuilder()
+            .setColor('#EF4444')
+            .setTitle('🚫 CANDIDATURA REPROVADA AUTOMATICAMENTE (SEM NOÇÃO)')
+            .setDescription(
+              `👤 **Candidato:** <@${interaction.user.id}> (${interaction.user.tag})\n` +
+              `🆔 **RG/Passaporte:** #${step1.passaporte || 'N/A'}\n` +
+              `⚠️ **Motivo da Reprovação:** ${validacao2.motivo}\n\n` +
+              `📝 **Respostas Registradas:**\n` +
+              `• Motivo: ${motivo}\n` +
+              `• Regras: ${aceitaRegras}\n` +
+              `• Conflito: ${situacaoConflito}`
+            )
+            .setFooter({ text: 'Sistema Anti-Troll • LS CUSTOMS' })
+            .setTimestamp();
+
+          await canalLogs.send({ embeds: [trollEmbed] });
+        }
+
+        await interaction.reply({
+          content: `❌ **Candidatura Reprovada Automaticamente!**\n\nIdentificamos respostas sem noção ou inadequadas:\n⚠️ **${validacao2.motivo}**\n\nA LS Customs exige seriedade e respeito às diretrizes de RP.`,
+          ephemeral: true
+        });
+        return;
+      }
+
+      // Enviar ficha completa para o canal da liderança
+      const canalLogs = client.channels.cache.get(CONFIG_LS.canalLogsRecrutamentoId);
+      if (canalLogs) {
+        const fichaEmbed = new EmbedBuilder()
+          .setColor(CONFIG_LS.corLS)
+          .setTitle('📋 NOVA CANDIDATURA DE RECRUTAMENTO')
+          .setDescription(
+            `👤 **Candidato:** <@${interaction.user.id}> (${interaction.user.tag})\n` +
+            `🆔 **Passaporte:** #${step1.passaporte}\n` +
+            `🎂 **Idade:** ${step1.idade} anos\n` +
+            `🔧 **Experiência:** ${step1.experiencia}\n\n` +
+            `🎯 **5. Motivo de Entrada:** ${motivo}\n` +
+            `⏰ **6. Disponibilidade:** ${disponibilidade}\n` +
+            `📜 **7. Aceita Regras & Ponto:** ${aceitaRegras}\n` +
+            `🤝 **8. Resolução de Conflito:** ${situacaoConflito}`
+          )
+          .setFooter({ text: 'Aguardando avaliação da Liderança LS Customs' })
+          .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`aprovar_rec_${interaction.user.id}`)
+            .setLabel('✅ Aprovar Candidato')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`recusar_rec_${interaction.user.id}`)
+            .setLabel('❌ Recusar')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+        await canalLogs.send({ embeds: [fichaEmbed], components: [row] });
+      }
+
+      tempRecruitment.delete(interaction.user.id);
+
+      await interaction.reply({
+        content: '✅ **Candidatura enviada com sucesso!**\nA Liderança da **LS Customs** analisará suas respostas e aprovará seu registro.',
+        ephemeral: true
+      });
+      return;
+    }
     // SUBMIT: APLICAR ADVERTÊNCIA
     if (interaction.customId === 'modal_aplicar_adv') {
       const funcionario = interaction.fields.getTextInputValue('adv_funcionario');
