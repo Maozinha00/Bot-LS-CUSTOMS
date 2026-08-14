@@ -170,6 +170,21 @@ function validarCandidaturaSemNocao(dados) {
 }
 
 // ==========================================
+// 🛡️ TRATAMENTO GLOBAL DE ERROS (ANTI-CRASH)
+// ==========================================
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️ [ERRO INTERNO / UNHANDLED REJECTION]:', reason);
+});
+
+process.on('uncaughtException', (err, origin) => {
+  console.error(`💥 [EXCEÇÃO NÃO TRATADA]: ${err?.message || err}`, origin);
+});
+
+process.on('uncaughtExceptionMonitor', (err, origin) => {
+  console.error('🔍 [MONITOR DE EXCEÇÕES]:', err, origin);
+});
+
+// ==========================================
 // 🌐 SERVIDOR WEB NATIVO PARA UPTIME 24/7
 // ==========================================
 const server = http.createServer((req, res) => {
@@ -179,6 +194,15 @@ const server = http.createServer((req, res) => {
   } else {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('🔧 Bot LS Customs (Recrutamento, Ausências Máx 5 Dias e Painel ADV) Online 24/7!');
+  }
+});
+
+// Tratamento de erro na porta do servidor web (caso a porta já esteja em uso no host)
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.warn(`⚠️ Porta ${PORT} em uso. O servidor web continuará em modo secundário.`);
+  } else {
+    console.error('❌ Erro no Servidor HTTP:', e);
   }
 });
 
@@ -197,6 +221,15 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
   ],
   partials: [Partials.Channel, Partials.GuildMember, Partials.User],
+});
+
+// Listener de erro nativo do discord.js (evita crash com throw er)
+client.on('error', (error) => {
+  console.error('⚠️ [DISCORD CLIENT ERROR]:', error?.message || error);
+});
+
+client.on('warn', (warning) => {
+  console.warn('⚠️ [DISCORD CLIENT WARNING]:', warning);
 });
 
 // ==========================================
@@ -432,7 +465,8 @@ client.on(Events.MessageCreate, async (message) => {
 // 🖱️ TRATAMENTO DE BOTÕES, MODAIS E SLASH COMMANDS
 // ==========================================
 client.on(Events.InteractionCreate, async (interaction) => {
-  // 1. SLASH COMMANDS
+  try {
+    // 1. SLASH COMMANDS
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === 'paineladv') {
       const advEmbed = new EmbedBuilder()
@@ -874,6 +908,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
       return;
     }
+  } catch (err) {
+    console.error('❌ [ERRO NA INTERAÇÃO]:', err);
+    try {
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: '⚠️ Ocorreu um erro ao processar esta ação. Tente novamente.', ephemeral: true });
+      } else {
+        await interaction.reply({ content: '⚠️ Ocorreu um erro ao processar esta ação. Tente novamente.', ephemeral: true });
+      }
+    } catch (_) {}
   }
 });
 
