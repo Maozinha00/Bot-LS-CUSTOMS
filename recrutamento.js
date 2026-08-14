@@ -1,4 +1,4 @@
-/**
+e/**
  * ============================================================================
  * 📝 LS CUSTOMS — SISTEMA DE RECRUTAMENTO & REGISTRO
  * ARQUIVO: recrutamento.js
@@ -29,7 +29,7 @@ function gerarPainelRecrutamento() {
       '• Cumprir metas semanais e pontualidade.\n\n' +
       'Clique no botão abaixo para preencher sua ficha de inscrição oficial.'
     )
-    .setImage(configLS.bannerUrl)
+.setImage('https://i.imgur.com/Vv2juos.jpeg')
     .setFooter({ text: 'LS Customs • Recrutamento' });
 
   const row = new ActionRowBuilder().addComponents(
