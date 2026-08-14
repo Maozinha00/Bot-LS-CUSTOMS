@@ -16,17 +16,17 @@
  * 5. ⏱️ Sistema de Bate-Ponto Interativo (Entrada, Saída com Cálculo de Horas, Status)
  * 6. 🚨 Painel e Comando de Demissão (/demitir e /paineldemissao)
  * 7. 💰 Tabela de Preços (/tabela) & Frequência de Rádio (/radio)
- * 8. 🌐 Servidor Express Embutido para Uptime 24/7 (SquareCloud, Discloud, VPS)
+ * 8. 🌐 Servidor HTTP Embutido para Uptime 24/7 (SquareCloud, Discloud, VPS, Replit)
  * 
  * 📦 Dependências necessárias:
- * npm install discord.js dotenv express
+ * npm install discord.js dotenv
  * 
  * 🚀 Como Executar:
  * node bot.js
  */
 
 require('dotenv').config();
-const express = require('express');
+const http = require('http');
 const { 
   Client, 
   GatewayIntentBits, 
@@ -68,6 +68,7 @@ const CONFIG_LS = {
     '1515125822795546715' // Cargo de Staff / Liderança LS Customs
   ],
   cargoRecrutaId: '1536304132980473896',
+  cargoAprovadoExtraId: '1537151042888671365',
 
   // 📻 CONFIGURAÇÕES GERAIS
   radioFreq: process.env.RADIO_FREQ || '633',
@@ -79,15 +80,21 @@ const CONFIG_LS = {
 };
 
 // ==========================================
-// 🌐 SERVIDOR WEB PARA UPTIME 24/7
+// 🌐 SERVIDOR WEB NATIVO (HTTP) PARA UPTIME 24/7
+// Utiliza módulo padrão do Node.js (sem precisar de express)
 // ==========================================
-const app = express();
-app.get('/', (req, res) => {
-  res.send('🔧 Bot da Mecânica LS Customs & Painel de Ausências Online 24/7!');
+const server = http.createServer((req, res) => {
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'online', time: new Date().toISOString() }));
+  } else {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('🔧 Bot da Mecânica LS Customs & Painel de Ausências Online 24/7!');
+  }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🌐 [LS CUSTOMS] Servidor Web de Uptime rodando na porta ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🌐 [LS CUSTOMS] Servidor Web de Uptime (HTTP) rodando na porta ${PORT}`);
 });
 
 // ==========================================
@@ -524,7 +531,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const situacao = interaction.fields.getTextInputValue('reg_situacao');
 
       registrosTemporarios.delete(interaction.user.id);
-      const novoNick = `|Recruta| ${temp.nome} | #${temp.passaporte}`.substring(0, 32);
+      const passaporteLimpo = (temp.passaporte || '').replace('#', '');
+      const novoNick = `|R| ${temp.nome} | #${passaporteLimpo}`.substring(0, 32);
 
       await interaction.reply({
         content: '✅ **Formulário enviado com sucesso!** A Liderança da LS Customs irá analisar suas respostas.',
@@ -539,7 +547,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setDescription(
             `📌 **CANDIDATURA PENDENTE DE AVALIAÇÃO**\n\n` +
             `👤 **1. Nome In-Game**: ${temp.nome}\n` +
-            `🆔 **2. Passaporte**: #${temp.passaporte}\n` +
+            `🆔 **2. Passaporte**: #${passaporteLimpo}\n` +
             `🎂 **3. Idade**: ${temp.idade}\n` +
             `🔧 **4. Experiência**: ${temp.experiencia}\n` +
             `🎯 **5. Motivo**: ${porque}\n` +
@@ -555,7 +563,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId(`btn_aprovar_${interaction.user.id}_${encodeURIComponent(temp.nome)}_${temp.passaporte}`)
+            .setCustomId(`btn_aprovar_${interaction.user.id}_${encodeURIComponent(temp.nome)}_${passaporteLimpo}`)
             .setLabel('✅ Aprovar e Setar Tag')
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
@@ -583,8 +591,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       if (isApprove) {
         const nome = decodeURIComponent(parts[3] || '');
-        const passaporte = parts[4] || '';
-        const novoNick = `|Recruta| ${nome} | #${passaporte}`.substring(0, 32);
+        const passaporte = (parts[4] || '').replace('#', '');
+        const novoNick = `|R| ${nome} | #${passaporte}`.substring(0, 32);
 
         try {
           const targetMember = await guild.members.fetch(targetUserId).catch(() => null);
@@ -592,16 +600,30 @@ client.on(Events.InteractionCreate, async (interaction) => {
             if (targetMember.manageable) {
               await targetMember.setNickname(novoNick).catch(() => {});
             }
-            const cargo = guild.roles.cache.get(CONFIG_LS.cargoRecrutaId) || guild.roles.cache.find(r => r.name.toUpperCase().includes('RECRUTA'));
-            if (cargo) {
-              await targetMember.roles.add(cargo).catch(() => {});
+
+            // Atribui Cargo Recruta e Cargo Adicional (1537151042888671365)
+            const cargos = [CONFIG_LS.cargoRecrutaId, CONFIG_LS.cargoAprovadoExtraId];
+            for (const cId of cargos) {
+              if (cId) {
+                const r = guild.roles.cache.get(cId);
+                if (r) await targetMember.roles.add(r).catch(() => {});
+              }
+            }
+
+            const cargoNome = guild.roles.cache.find(r => r.name.toUpperCase().includes('RECRUTA'));
+            if (cargoNome) {
+              await targetMember.roles.add(cargoNome).catch(() => {});
             }
           }
         } catch (e) {}
 
         const approvedEmbed = new EmbedBuilder()
           .setTitle('✅ RECRUTAMENTO APROVADO — LS CUSTOMS')
-          .setDescription(`🎉 <@${targetUserId}> foi aprovado por <@${staffUser.id}>!\n\n🏷️ **Nick Atribuído**: \`${novoNick}\``)
+          .setDescription(
+            `🎉 <@${targetUserId}> foi aprovado por <@${staffUser.id}>!\n\n` +
+            `🏷️ **Tag Setada**: \`${novoNick}\`\n` +
+            `🔰 **Cargos Atribuídos**: <@&${CONFIG_LS.cargoRecrutaId}> e <@&${CONFIG_LS.cargoAprovadoExtraId}>`
+          )
           .setColor(CONFIG_LS.corLS)
           .setTimestamp();
 
