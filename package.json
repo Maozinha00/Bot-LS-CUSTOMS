@@ -1,13 +1,25 @@
 {
-  "name": "ls-customs-discord-bot",
-  "version": "2.0.0",
-  "description": "Bot Oficial LS Customs - Ausências (5 Dias), ADVs e Bate-Ponto",
+  "name": "ls-customs-bot",
+  "version": "1.0.0",
+  "description": "Bot Oficial da Mecânica LS Customs & Sistema Modular de Eventos Automotivos e Disciplina",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node index.js"
   },
+  "keywords": [
+    "discord-bot",
+    "discord-js",
+    "ls-customs",
+    "fivem",
+    "eventos-automotivos",
+    "ponto",
+    "disciplina"
+  ],
+  "author": "LS Customs Staff",
+  "license": "ISC",
   "dependencies": {
-    "discord.js": "^14.17.3",
+    "discord.js": "^14.16.3",
     "dotenv": "^16.4.7"
   },
   "engines": {
