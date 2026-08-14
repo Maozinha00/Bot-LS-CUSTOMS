@@ -1,8 +1,7 @@
 /**
  * ============================================================================
  * 🔧 BOT OFICIAL UNIFICADO — LOS SANTOS CUSTOMS (MECÂNICA FIVE-M)
- * Arquitetura Reorganizada, Modular, Blindada e 100% Otimizada
- * Versão: 3.0.0 • Discord.js v14
+ * Versão 3.1.0 • Discord.js v14 (Blindado contra erros & Interações 100% Seguras)
  * ============================================================================
  */
 
@@ -29,23 +28,23 @@ const {
 } = require('discord.js');
 
 // ============================================================================
-// 🛡️ [0] ANTI-CRASH GLOBAL (Proteção de Processo)
+// 🛡️ [0] ANTI-CRASH GLOBAL (Evita qualquer queda do bot)
 // ============================================================================
-process.on('unhandledRejection', (reason) => {
-  console.error('⚠️ [ANTI-CRASH] Rejeição de Promise não tratada:', reason);
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️ [ANTI-CRASH] Unhandled Rejection:', reason);
 });
-process.on('uncaughtException', (error) => {
-  console.error('⚠️ [ANTI-CRASH] Exceção não capturada:', error);
+process.on('uncaughtException', (error, origin) => {
+  console.error('⚠️ [ANTI-CRASH] Uncaught Exception:', error);
 });
 
 // ============================================================================
-// 🔑 [1] CONFIGURAÇÃO & IDs DA OFICINA
+// 🔑 [1] CONFIGURAÇÕES & IDs (Com Fallbacks Seguros)
 // ============================================================================
 const CONFIG = {
   token: process.env.DISCORD_TOKEN || process.env.TOKEN || 'SEU_DISCORD_BOT_TOKEN_AQUI',
   guildId: process.env.GUILD_ID || '1535806745816072245',
-  port: parseInt(process.env.PORT || '3001', 10),
-  prefix: process.env.PREFIX || '!',
+  port: parseInt(process.env.PORT || '3001', 10) || 3001,
+  prefix: process.env.PREFIX || '!' || '!',
 
   canais: {
     adv: process.env.CANAL_ADV_ID || '1536304172952191049',
@@ -71,18 +70,18 @@ const CONFIG = {
   },
 
   visual: {
-    corPrincipal: '#2ECC71',
-    corAlerta: '#E67E22',
-    corPerigo: '#EF4444',
-    corInfo: '#3B82F6',
-    bannerUrl: 'https://i.imgur.com/Vv2juos.jpeg',
-    logoUrl: 'https://i.imgur.com/8Q9Z5qA.png',
-    rodape: 'LS CUSTOMS • Setor Disciplinar, Ausências & Recrutamento'
+    corPrincipal: '#2ECC71' || '#2ECC71',
+    corAlerta: '#E67E22' || '#E67E22',
+    corPerigo: '#EF4444' || '#EF4444',
+    corInfo: '#3B82F6' || '#3B82F6',
+    bannerUrl: 'https://i.imgur.com/Vv2juos.jpeg' || 'https://i.imgur.com/Vv2juos.jpeg',
+    logoUrl: 'https://i.imgur.com/8Q9Z5qA.png' || 'https://i.imgur.com/8Q9Z5qA.png',
+    rodape: 'LS CUSTOMS • Setor Disciplinar, Ausências & Recrutamento' || 'LS CUSTOMS • Setor Disciplinar, Ausências & Recrutamento'
   }
 };
 
 // ============================================================================
-// 🗄️ [2] BANCO DE DADOS LOCAL (JSON Store Seguro)
+// 🗄️ [2] BANCO DE DADOS LOCAL (JSON Store Seguro com Auto-Criação)
 // ============================================================================
 const DB_FILE = path.join(__dirname, 'ls_database.json');
 
@@ -114,7 +113,7 @@ class DatabaseManager {
         this.salvar();
       }
     } catch (e) {
-      console.error('⚠️ [DATABASE] Erro ao ler banco local:', e.message);
+      console.error('⚠️ [DATABASE] Erro ao carregar banco local:', e.message);
     }
   }
 
@@ -126,7 +125,6 @@ class DatabaseManager {
     }
   }
 
-  // Métodos de Advertência
   getAdv(userId) {
     return this.data.advertencias[userId] || { pontos: 0, totalAdvs: 0, historico: [] };
   }
@@ -143,7 +141,6 @@ class DatabaseManager {
     return ref;
   }
 
-  // Métodos de Ausência
   getAusencia(userId) {
     return this.data.ausencias[userId] || null;
   }
@@ -153,7 +150,6 @@ class DatabaseManager {
     this.salvar();
   }
 
-  // Métodos de Bate-Ponto
   getPonto(userId) {
     return this.data.pontos[userId] || { status: 'OFF', totalSegundos: 0 };
   }
@@ -163,7 +159,6 @@ class DatabaseManager {
     this.salvar();
   }
 
-  // Métodos de Recrutamento
   setRecrutamento(userId, dados) {
     this.data.recrutamentos[userId] = dados;
     this.salvar();
@@ -173,20 +168,18 @@ class DatabaseManager {
 const db = new DatabaseManager(DB_FILE);
 
 // ============================================================================
-// 🎨 [3] DESIGN SYSTEM & GERADOR DE EMBEDS
+// 🎨 [3] EMBED FACTORY (Imagens Seguras contra DiscordAPIError 50035)
 // ============================================================================
-class EmbedFactory {
-  static baseEmbed(cor = CONFIG.visual.corPrincipal) {
-    return new EmbedBuilder()
-      .setColor(cor)
-      .setImage(CONFIG.visual.bannerUrl)
-      .setFooter({ text: CONFIG.visual.rodape })
-      .setTimestamp();
+function attachImagesSafely(embed) {
+  if (CONFIG.visual.bannerUrl && typeof CONFIG.visual.bannerUrl === 'string' && CONFIG.visual.bannerUrl.startsWith('http')) {
+    try { embed.setImage(CONFIG.visual.bannerUrl); } catch (e) {}
   }
+  return embed;
+}
 
-  // Painel de Boas-Vindas & Set de Recruta
+class EmbedFactory {
   static painelRecrutamento() {
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setColor(CONFIG.visual.corPrincipal)
       .setTitle('🔧 BEM-VINDO À LS CUSTOMS')
       .setDescription([
@@ -197,23 +190,23 @@ class EmbedFactory {
         '• Personalização e Bodykits',
         '• Performance & Tuning',
         '• Pinturas e Acabamentos\n',
-        '📜 Leia atentamente as regras e frequências do servidor antes de iniciar suas atividades.\n',
+        '📜 Leia atentamente as regras e diretrizes da oficina antes de iniciar.\n',
         '👉 **Para solicitar seu Set de Recruta, clique no botão abaixo:**',
         '1️⃣ Nome e Sobrenome In-Game',
         '2️⃣ Passaporte / ID In-Game\n',
         '⚙️ *O Bot alterará seu apelido para ``|Recruta| Nome | #ID`` e concederá o cargo de Recruta automaticamente!*\n',
         '🔧 **LS CUSTOMS — Respeito • Organização • Compromisso**'
       ].join('\n'))
-      .setImage(CONFIG.visual.bannerUrl)
-      .setFooter({ text: CONFIG.visual.rodape });
+      .setFooter({ text: CONFIG.visual.rodape || 'LS Customs' });
+
+    return attachImagesSafely(embed);
   }
 
-  // Recrutamento Aprovado (Formato Oficial)
   static recrutamentoAprovado(dados) {
     const { nomeRP, passaporte, userId, autorTag, statusNick, statusCargo } = dados;
     const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setColor(CONFIG.visual.corPrincipal)
       .setTitle('✅ RECRUTAMENTO APROVADO — LS CUSTOMS')
       .setDescription([
@@ -227,30 +220,30 @@ class EmbedFactory {
         `⚙️ **Status Apelido:** ${statusNick}`,
         `⚙️ **Status Cargo:** ${statusCargo}`
       ].join('\n'))
-      .setImage(CONFIG.visual.bannerUrl)
       .setFooter({ text: `Sistema de Recrutamento Automático • LS CUSTOMS • ${agora}` })
       .setTimestamp();
+
+    return attachImagesSafely(embed);
   }
 
-  // Painel de Advertências Disciplinares
   static painelAdv() {
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setColor(CONFIG.visual.corPerigo)
       .setTitle('⚠️ SETOR DISCIPLINAR — LS CUSTOMS')
       .setDescription([
         'Bem-vindo ao setor disciplinar da **Los Santos Customs**.\n',
         '🟡 **ADVERTÊNCIA LEVE (1 Ponto):** Atrasos / Uniforme / Falhas operacionais simples. *(Não demite)*',
         '🟠 **ADVERTÊNCIA MÉDIA (2 Pontos):** Desobediência / Direção perigosa / Conflitos. *(Não demite)*',
-        '🔴 **ADVERTÊNCIA GRAVE (3 Pontos):** Cobrança fora da tabela / Abandono de serviço / Desonestidade.\n',
-        '⛔ **REGRA DOS 3 PONTOS:** Apenas ao acumular **3 pontos** ou receber 1 ADV Grave ocorre a **EXONERAÇÃO IMEDIATA**!'
+        '🔴 **ADVERTÊNCIA GRAVE (3 Pontos):** Cobrança indevida / Abandono de serviço / Desonestidade.\n',
+        '⛔ **REGRA DOS 3 PONTOS:** Ao acumular **3 pontos** ou receber 1 ADV Grave ocorre a **EXONERAÇÃO IMEDIATA**!'
       ].join('\n'))
-      .setImage(CONFIG.visual.bannerUrl)
-      .setFooter({ text: CONFIG.visual.rodape });
+      .setFooter({ text: CONFIG.visual.rodape || 'LS Customs' });
+
+    return attachImagesSafely(embed);
   }
 
-  // Painel de Ausências
   static painelAusencia() {
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setColor(CONFIG.visual.corAlerta)
       .setTitle('🌴 REGISTRO DE AUSÊNCIAS & LICENÇAS — LS CUSTOMS')
       .setDescription([
@@ -261,13 +254,13 @@ class EmbedFactory {
         '• Se a ausência expirar sem aviso prévio à liderança, o sistema aplicará **ADV Grave** automática por abandono.',
         '• Ao retornar à cidade, clique no botão **↩️ Informar Retorno**.'
       ].join('\n'))
-      .setImage(CONFIG.visual.bannerUrl)
-      .setFooter({ text: CONFIG.visual.rodape });
+      .setFooter({ text: CONFIG.visual.rodape || 'LS Customs' });
+
+    return attachImagesSafely(embed);
   }
 
-  // Painel de Bate-Ponto
   static painelPonto() {
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setColor(CONFIG.visual.corInfo)
       .setTitle('⏱️ BATE-PONTO ELETRÔNICO — LS CUSTOMS')
       .setDescription([
@@ -276,13 +269,13 @@ class EmbedFactory {
         '🟡 **Pausa / Intervalo:** Pausa temporária.',
         '🔴 **Finalizar Serviço:** Encerra o turno e gera o relatório.'
       ].join('\n'))
-      .setImage(CONFIG.visual.bannerUrl)
-      .setFooter({ text: CONFIG.visual.rodape });
+      .setFooter({ text: CONFIG.visual.rodape || 'LS Customs' });
+
+    return attachImagesSafely(embed);
   }
 
-  // Tabela de Preços Oficial
   static tabelaPrecos() {
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setColor(CONFIG.visual.corPrincipal)
       .setTitle('🔧 TABELA OFICIAL DE PREÇOS — LOS SANTOS CUSTOMS')
       .setDescription('Valores oficiais padronizados para serviços da oficina:')
@@ -326,25 +319,47 @@ class EmbedFactory {
           inline: false
         }
       )
-      .setImage(CONFIG.visual.bannerUrl)
-      .setFooter({ text: CONFIG.visual.rodape })
+      .setFooter({ text: CONFIG.visual.rodape || 'LS Customs' })
       .setTimestamp();
+
+    return attachImagesSafely(embed);
   }
 }
 
-// ==========================================
-// 🛡️ [4] VALIDAÇÃO ANTI-TROLL RECRUTAMENTO
-// ==========================================
+// ============================================================================
+// 🛡️ [4] VALIDAÇÃO ANTI-TROLL & PERMISSÕES
+// ============================================================================
+function checkIsLeader(member) {
+  if (!member) return false;
+  
+  // Verifica se é administrador
+  if (member.permissions && typeof member.permissions.has === 'function') {
+    if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
+  }
+
+  // Verifica cargo liderança
+  if (member.roles) {
+    if (member.roles.cache && typeof member.roles.cache.has === 'function') {
+      if (member.roles.cache.has(CONFIG.cargos.lideranca)) return true;
+    }
+    if (Array.isArray(member.roles)) {
+      if (member.roles.includes(CONFIG.cargos.lideranca)) return true;
+    }
+  }
+
+  return false;
+}
+
 function validarCandidatura(dados) {
   const { nome, passaporte, idadeDisp, exp, motivo } = dados;
 
   const passLimpo = passaporte ? passaporte.replace(/\D/g, '') : '';
   if (!passLimpo || parseInt(passLimpo, 10) <= 0) {
-    return { valido: false, motivo: 'Passaporte inválido! Digite apenas o número do seu ID in-game.' };
+    return { valido: false, motivo: 'Passaporte inválido! Digite apenas os números do seu ID.' };
   }
 
   if (!nome || nome.trim().length < 3 || /^[0-9]+$/.test(nome.trim())) {
-    return { valido: false, motivo: 'Nome RP inválido! Digite seu nome e sobrenome do personagem.' };
+    return { valido: false, motivo: 'Nome RP inválido! Digite seu nome e sobrenome de personagem.' };
   }
 
   if (idadeDisp !== undefined && exp !== undefined && motivo !== undefined) {
@@ -357,7 +372,7 @@ function validarCandidatura(dados) {
     }
 
     const textoCombinado = `${exp} ${motivo}`.toLowerCase();
-    if (textoCombinado.length < 12) {
+    if (textoCombinado.length < 10) {
       return { valido: false, motivo: 'Respostas muito curtas! Descreva melhor suas qualificações.' };
     }
   }
@@ -366,9 +381,7 @@ function validarCandidatura(dados) {
 }
 
 // ============================================================================
-// ⚠️ [5] MÓDULO DISCIPLINAR (Advertências & Exoneração)
-// Canal: 1536304172952191049
-// Regra: LEVE (+1) e MÉDIA (+2) somam pontos. Demissão em 3 PONTOS ou GRAVE.
+// ⚠️ [5] MÓDULO DISCIPLINAR
 // ============================================================================
 async function processarAdvertencia(guild, userId, passaporte, tipo, motivo, provas, autorTag) {
   let pontosGanhos = 1;
@@ -398,15 +411,15 @@ async function processarAdvertencia(guild, userId, passaporte, tipo, motivo, pro
   const totalPontos = statusAdv.pontos;
   const totalAdvs = statusAdv.totalAdvs;
 
-  // Atribuir cargo de advertência
+  // Atribuir cargo correspondente de forma segura
   try {
     const member = await guild.members.fetch(userId).catch(() => null);
-    if (member && cargoId) {
-      await member.roles.add(cargoId).catch(() => null);
+    if (member && cargoId && guild.roles.cache.has(cargoId)) {
+      await member.roles.add(cargoId).catch(err => console.warn('Não foi possível dar cargo ADV:', err.message));
     }
   } catch (e) {}
 
-  // Enviar no Canal Oficial de Advertências (1536304172952191049)
+  // Enviar no Canal de Advertências (Canal 1536304172952191049)
   const canalAdv = guild.channels.cache.get(CONFIG.canais.adv) || guild.channels.cache.get(CONFIG.canais.logsAdv);
   if (canalAdv) {
     const embedAdv = new EmbedBuilder()
@@ -421,14 +434,14 @@ async function processarAdvertencia(guild, userId, passaporte, tipo, motivo, pro
         `🔗 **Provas:** ${provas || 'Nenhuma'}`,
         `👮 **Aplicado por:** ${autorTag}`
       ].join('\n'))
-      .setImage(CONFIG.visual.bannerUrl)
-      .setFooter({ text: CONFIG.visual.rodape })
+      .setFooter({ text: CONFIG.visual.rodape || 'LS Customs' })
       .setTimestamp();
 
-    canalAdv.send({ embeds: [embedAdv] }).catch(() => null);
+    attachImagesSafely(embedAdv);
+    canalAdv.send({ embeds: [embedAdv] }).catch(err => console.warn('Erro ao enviar log ADV:', err.message));
   }
 
-  // Notificar membro via DM
+  // DM ao usuário
   try {
     const user = await guild.client.users.fetch(userId).catch(() => null);
     if (user) {
@@ -441,7 +454,7 @@ async function processarAdvertencia(guild, userId, passaporte, tipo, motivo, pro
           `📝 **Motivo:** ${motivo}`,
           `📈 **Acúmulo Atual:** ``${totalPontos}/3 Pontos``.\n`,
           totalPontos < 3 && tipo !== 'GRAVE'
-            ? 'ℹ️ Você continua na equipe ativa. Evite novas ocorrências!'
+            ? 'ℹ️ Você continua na equipe ativa. Cumpra as regras para evitar punições maiores!'
             : '⚠️ **Atenção:** Ao atingir 3 pontos, ocorre a **exoneração imediata**!'
         ].join('\n'))
         .setTimestamp();
@@ -450,13 +463,13 @@ async function processarAdvertencia(guild, userId, passaporte, tipo, motivo, pro
     }
   } catch (e) {}
 
-  // ⛔ Checagem de Demissão Automática (3 Pontos ou ADV Grave)
+  // Demissão Automática em 3 pontos ou GRAVE
   if (totalPontos >= 3 || tipo === 'GRAVE') {
     await processarDemissao(
       guild, 
       userId, 
       passaporte, 
-      `Exoneração automática por acúmulo de advertências (${totalPontos}/3 pontos disciplinados).`,
+      `Exoneração automática por acúmulo de advertências (${totalPontos}/3 pontos).`,
       'Sistema Disciplinar Automático'
     );
   }
@@ -465,7 +478,7 @@ async function processarAdvertencia(guild, userId, passaporte, tipo, motivo, pro
 }
 
 // ============================================================================
-// 🛑 [6] MÓDULO DE DEMISSÃO / EXONERAÇÃO
+// 🛑 [6] MÓDULO DE DEMISSÃO
 // ============================================================================
 async function processarDemissao(guild, userId, passaporte, motivo, autorTag) {
   try {
@@ -478,7 +491,7 @@ async function processarDemissao(guild, userId, passaporte, motivo, autorTag) {
         CONFIG.cargos.advLeve,
         CONFIG.cargos.advMedia,
         CONFIG.cargos.advGrave
-      ].filter(Boolean);
+      ].filter(c => c && guild.roles.cache.has(c));
 
       for (const cId of cargosRemover) {
         if (member.roles.cache.has(cId)) {
@@ -486,12 +499,11 @@ async function processarDemissao(guild, userId, passaporte, motivo, autorTag) {
         }
       }
 
-      if (CONFIG.cargos.demitido) {
+      if (CONFIG.cargos.demitido && guild.roles.cache.has(CONFIG.cargos.demitido)) {
         await member.roles.add(CONFIG.cargos.demitido).catch(() => null);
       }
     }
 
-    // Registro no Canal de Demissões
     const canalDemissao = guild.channels.cache.get(CONFIG.canais.demissao);
     if (canalDemissao) {
       const embedDemissao = new EmbedBuilder()
@@ -505,10 +517,10 @@ async function processarDemissao(guild, userId, passaporte, motivo, autorTag) {
           `👮 **Responsável:** ${autorTag}`,
           `📅 **Data:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`
         ].join('\n'))
-        .setImage(CONFIG.visual.bannerUrl)
-        .setFooter({ text: CONFIG.visual.rodape })
+        .setFooter({ text: CONFIG.visual.rodape || 'LS Customs' })
         .setTimestamp();
 
+      attachImagesSafely(embedDemissao);
       canalDemissao.send({ embeds: [embedDemissao] }).catch(() => null);
     }
   } catch (err) {
@@ -517,47 +529,50 @@ async function processarDemissao(guild, userId, passaporte, motivo, autorTag) {
 }
 
 // ============================================================================
-// ⏰ [7] MÓDULO DE AUSÊNCIAS & VERIFICAÇÃO AUTOMÁTICA
+// ⏰ [7] MÓDULO DE AUSÊNCIAS (Verificação Periódica)
 // ============================================================================
-async function verificarAusenciasVencidas(client) {
-  const agora = Date.now();
-  const guild = client.guilds.cache.get(CONFIG.guildId);
-  if (!guild) return;
+async function verificarAusenciasVencidas(clientInstance) {
+  try {
+    const agora = Date.now();
+    const guild = clientInstance.guilds.cache.get(CONFIG.guildId);
+    if (!guild) return;
 
-  const canalLogs = guild.channels.cache.get(CONFIG.canais.logsAusencia);
+    const canalLogs = guild.channels.cache.get(CONFIG.canais.logsAusencia);
 
-  for (const [userId, dados] of Object.entries(db.data.ausencias)) {
-    if (dados.status === 'ATIVA' && agora > dados.vencimento) {
-      dados.status = 'VENCIDA';
-      db.salvar();
+    for (const [userId, dados] of Object.entries(db.data.ausencias)) {
+      if (dados.status === 'ATIVA' && agora > dados.vencimento) {
+        dados.status = 'VENCIDA';
+        db.salvar();
 
-      console.log(`⚠️ Ausência expirada: Usuário ${userId} | Passaporte ${dados.passaporte}`);
+        console.log(`⚠️ Ausência expirada: Usuário ${userId} | Passaporte ${dados.passaporte}`);
 
-      // Aplicar ADV Grave automática por abandono
-      await processarAdvertencia(
-        guild, 
-        userId, 
-        dados.passaporte, 
-        'GRAVE', 
-        'Ausência expirada sem retorno ou justificativa prévia (Abandono de Função).', 
-        'Sistema Automático de Ausências',
-        'Sistema Automático'
-      );
+        await processarAdvertencia(
+          guild, 
+          userId, 
+          dados.passaporte, 
+          'GRAVE', 
+          'Ausência expirada sem retorno ou aviso prévio à Liderança (Abandono de Função).', 
+          'Sistema Automático de Ausências',
+          'Sistema Automático'
+        );
 
-      if (canalLogs) {
-        const embedExp = new EmbedBuilder()
-          .setColor(CONFIG.visual.corPerigo)
-          .setTitle('🚨 AUSÊNCIA EXPIRADA — PUNIÇÃO AUTOMÁTICA')
-          .setDescription([
-            `O prazo de licença do mecânico <@${userId}> (``${dados.nomeRP}`` - ID: ``${dados.passaporte}``) **EXPIROU**!\n`,
-            `📅 **Prazo concedido:** ${dados.dias} dia(s)`,
-            `⚠️ **Sanção Aplicada:** Advertência Grave automática por abandono de função.`
-          ].join('\n'))
-          .setTimestamp();
+        if (canalLogs) {
+          const embedExp = new EmbedBuilder()
+            .setColor(CONFIG.visual.corPerigo)
+            .setTitle('🚨 AUSÊNCIA EXPIRADA — PUNIÇÃO AUTOMÁTICA')
+            .setDescription([
+              `O prazo de licença do mecânico <@${userId}> (``${dados.nomeRP}`` - ID: ``${dados.passaporte}``) **EXPIROU**!\n`,
+              `📅 **Prazo concedido:** ${dados.dias} dia(s)`,
+              `⚠️ **Sanção Aplicada:** Advertência Grave automática por abandono de função.`
+            ].join('\n'))
+            .setTimestamp();
 
-        canalLogs.send({ embeds: [embedExp] }).catch(() => null);
+          canalLogs.send({ embeds: [embedExp] }).catch(() => null);
+        }
       }
     }
+  } catch (e) {
+    console.error('Erro na rotina de ausências:', e.message);
   }
 }
 
@@ -576,61 +591,36 @@ const client = new Client({
 });
 
 const slashCommands = [
-  new SlashCommandBuilder()
-    .setName('painelregistro')
-    .setDescription('Envia o Painel Oficial de Boas-Vindas e Set de Recruta'),
-
-  new SlashCommandBuilder()
-    .setName('paineladv')
-    .setDescription('Envia o Painel Interativo de Advertências Disciplinares'),
-
-  new SlashCommandBuilder()
-    .setName('painelausencia')
-    .setDescription('Envia o Painel Interativo de Ausências & Licenças'),
-
-  new SlashCommandBuilder()
-    .setName('painelponto')
-    .setDescription('Envia o Painel Interativo de Bate-Ponto'),
-
-  new SlashCommandBuilder()
-    .setName('tabela')
-    .setDescription('Exibe a Tabela Oficial de Preços e Serviços'),
-
-  new SlashCommandBuilder()
-    .setName('minhasadvs')
-    .setDescription('Consulta seu histórico pessoal de advertências disciplinares'),
-
-  new SlashCommandBuilder()
-    .setName('verificarvencidas')
-    .setDescription('Verifica manualmente ausências expiradas e pune automático'),
-
-  new SlashCommandBuilder()
-    .setName('demitir')
-    .setDescription('Exonera um membro da equipe (Apenas Liderança)')
+  new SlashCommandBuilder().setName('painelregistro').setDescription('Envia o Painel Oficial de Boas-Vindas e Set de Recruta'),
+  new SlashCommandBuilder().setName('paineladv').setDescription('Envia o Painel Interativo de Advertências Disciplinares'),
+  new SlashCommandBuilder().setName('painelausencia').setDescription('Envia o Painel Interativo de Ausências & Licenças'),
+  new SlashCommandBuilder().setName('painelponto').setDescription('Envia o Painel Interativo de Bate-Ponto'),
+  new SlashCommandBuilder().setName('tabela').setDescription('Exibe a Tabela Oficial de Preços e Serviços'),
+  new SlashCommandBuilder().setName('minhasadvs').setDescription('Consulta seu histórico pessoal de advertências'),
+  new SlashCommandBuilder().setName('verificarvencidas').setDescription('Verifica manualmente ausências expiradas'),
+  new SlashCommandBuilder().setName('demitir').setDescription('Exonera um membro da equipe (Liderança)')
     .addUserOption(opt => opt.setName('membro').setDescription('Membro a ser demitido').setRequired(true))
-    .addStringOption(opt => opt.setName('passaporte').setDescription('Passaporte / ID RP').setRequired(true))
+    .addStringOption(opt => opt.setName('passaporte').setDescription('Passaporte RP').setRequired(true))
     .addStringOption(opt => opt.setName('motivo').setDescription('Motivo da exoneração').setRequired(true))
     .addStringOption(opt => opt.setName('provas').setDescription('Link de provas (opcional)').setRequired(false)),
-
-  new SlashCommandBuilder()
-    .setName('ajuda')
-    .setDescription('Lista todos os comandos e painéis da oficina')
+  new SlashCommandBuilder().setName('ajuda').setDescription('Lista todos os comandos e painéis da oficina')
 ];
 
 client.once(Events.ClientReady, async (c) => {
-  console.log(`✅ [DISCORD] Bot conectado com sucesso como: ${c.user.tag}`);
+  console.log(`✅ [DISCORD] Bot conectado como: ${c.user.tag}`);
 
   // Registrar Slash Commands na Guild
-  const rest = new REST({ version: '10' }).setToken(CONFIG.token);
-  try {
-    console.log('🔄 Registrando Slash Commands no servidor...');
-    await rest.put(Routes.applicationGuildCommands(c.user.id, CONFIG.guildId), { body: slashCommands });
-    console.log('✅ Slash Commands registrados com sucesso!');
-  } catch (e) {
-    console.error('⚠️ Erro ao registrar slash commands:', e.message);
+  if (CONFIG.token && CONFIG.guildId) {
+    const rest = new REST({ version: '10' }).setToken(CONFIG.token);
+    try {
+      console.log('🔄 Registrando Slash Commands no servidor...');
+      await rest.put(Routes.applicationGuildCommands(c.user.id, CONFIG.guildId), { body: slashCommands });
+      console.log('✅ Slash Commands registrados com sucesso!');
+    } catch (e) {
+      console.error('⚠️ Aviso ao registrar slash commands (verifique IDs no .env):', e.message);
+    }
   }
 
-  // Rotina de Ausências Vencidas a cada 10 minutos
   setInterval(() => {
     verificarAusenciasVencidas(client);
   }, 10 * 60 * 1000);
@@ -640,72 +630,76 @@ client.once(Events.ClientReady, async (c) => {
 // 📨 [9] COMANDOS POR PREFIXO (!painel-...)
 // ============================================================================
 client.on(Events.MessageCreate, async (message) => {
-  if (message.author.bot || !message.guild) return;
+  try {
+    if (message.author.bot || !message.guild) return;
 
-  const content = message.content.trim();
+    const content = message.content.trim().toLowerCase();
 
-  // 1. Painel de Boas-Vindas / Registro
-  if (['!painel-registro', '!registro', '!setrecruta', '!painel-bemvindo'].includes(content)) {
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('btn_solicitar_set_recruta').setLabel('🔰 Solicitar Set de Recruta').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('btn_iniciar_recrutamento').setLabel('📝 Formulário Completo').setStyle(ButtonStyle.Secondary)
-    );
-    return message.channel.send({ embeds: [EmbedFactory.painelRecrutamento()], components: [row] });
-  }
+    // 1. Painel de Boas-Vindas / Registro
+    if (['!painel-registro', '!registro', '!setrecruta', '!painel-bemvindo'].includes(content)) {
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('btn_solicitar_set_recruta').setLabel('🔰 Solicitar Set de Recruta').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('btn_iniciar_recrutamento').setLabel('📝 Formulário Completo').setStyle(ButtonStyle.Secondary)
+      );
+      return await message.channel.send({ embeds: [EmbedFactory.painelRecrutamento()], components: [row] });
+    }
 
-  // 2. Painel de Advertências
-  if (['!painel-adv', '!paineladv', '!adv'].includes(content)) {
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('btn_abrir_modal_adv').setLabel('⚠️ Aplicar Advertência').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('btn_consultar_minhas_advs').setLabel('📋 Minhas Advertências').setStyle(ButtonStyle.Secondary)
-    );
-    return message.channel.send({ embeds: [EmbedFactory.painelAdv()], components: [row] });
-  }
+    // 2. Painel de Advertências
+    if (['!painel-adv', '!paineladv', '!adv'].includes(content)) {
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('btn_abrir_modal_adv').setLabel('⚠️ Aplicar Advertência').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('btn_consultar_minhas_advs').setLabel('📋 Minhas Advertências').setStyle(ButtonStyle.Secondary)
+      );
+      return await message.channel.send({ embeds: [EmbedFactory.painelAdv()], components: [row] });
+    }
 
-  // 3. Painel de Ausências
-  if (['!painel-ausencia', '!painelausencia', '!ausencia'].includes(content)) {
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('btn_abrir_modal_ausencia').setLabel('🌴 Solicitar Ausência').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('btn_informar_retorno_ausencia').setLabel('↩️ Informar Retorno').setStyle(ButtonStyle.Success)
-    );
-    return message.channel.send({ embeds: [EmbedFactory.painelAusencia()], components: [row] });
-  }
+    // 3. Painel de Ausências
+    if (['!painel-ausencia', '!painelausencia', '!ausencia'].includes(content)) {
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('btn_abrir_modal_ausencia').setLabel('🌴 Solicitar Ausência').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('btn_informar_retorno_ausencia').setLabel('↩️ Informar Retorno').setStyle(ButtonStyle.Success)
+      );
+      return await message.channel.send({ embeds: [EmbedFactory.painelAusencia()], components: [row] });
+    }
 
-  // 4. Painel de Bate-Ponto
-  if (['!painel-ponto', '!ponto'].includes(content)) {
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('btn_ponto_entrar').setLabel('🟢 Entrar em Serviço').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('btn_ponto_finalizar').setLabel('🔴 Finalizar Serviço').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('btn_ponto_consultar').setLabel('📊 Minhas Horas').setStyle(ButtonStyle.Primary)
-    );
-    return message.channel.send({ embeds: [EmbedFactory.painelPonto()], components: [row] });
-  }
+    // 4. Painel de Bate-Ponto
+    if (['!painel-ponto', '!ponto'].includes(content)) {
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('btn_ponto_entrar').setLabel('🟢 Entrar em Serviço').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('btn_ponto_finalizar').setLabel('🔴 Finalizar Serviço').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('btn_ponto_consultar').setLabel('📊 Minhas Horas').setStyle(ButtonStyle.Primary)
+      );
+      return await message.channel.send({ embeds: [EmbedFactory.painelPonto()], components: [row] });
+    }
 
-  // 5. Tabela de Preços
-  if (content === '!tabela') {
-    return message.channel.send({ embeds: [EmbedFactory.tabelaPrecos()] });
-  }
+    // 5. Tabela de Preços
+    if (content === '!tabela') {
+      return await message.channel.send({ embeds: [EmbedFactory.tabelaPrecos()] });
+    }
 
-  // 6. Ajuda
-  if (content === '!ajuda') {
-    const embedAjuda = new EmbedBuilder()
-      .setColor(CONFIG.visual.corPrincipal)
-      .setTitle('📖 GUIA DE COMANDOS & PAINÉIS — LS CUSTOMS')
-      .setDescription([
-        '**Painéis Principais:**',
-        '• ``!painel-registro`` ou ``/painelregistro`` — Boas-vindas e Set de Recruta',
-        '• ``!painel-adv`` ou ``/paineladv`` — Painel de Advertências',
-        '• ``!painel-ausencia`` ou ``/painelausencia`` — Painel de Ausências',
-        '• ``!painel-ponto`` ou ``/painelponto`` — Bate-Ponto Eletrônico\n',
-        '**Comandos Rápidos:**',
-        '• ``!tabela`` ou ``/tabela`` — Tabela de Preços de Serviços',
-        '• ``/minhasadvs`` — Consulta suas advertências ativas',
-        '• ``/verificarvencidas`` — Checa ausências expiradas',
-        '• ``/demitir`` — Exonera membro da facção (Líder)'
-      ].join('\n'))
-      .setFooter({ text: CONFIG.visual.rodape });
+    // 6. Ajuda
+    if (content === '!ajuda') {
+      const embedAjuda = new EmbedBuilder()
+        .setColor(CONFIG.visual.corPrincipal)
+        .setTitle('📖 GUIA DE COMANDOS & PAINÉIS — LS CUSTOMS')
+        .setDescription([
+          '**Painéis Principais:**',
+          '• ``!painel-registro`` ou ``/painelregistro`` — Boas-vindas e Set de Recruta',
+          '• ``!painel-adv`` ou ``/paineladv`` — Painel de Advertências',
+          '• ``!painel-ausencia`` ou ``/painelausencia`` — Painel de Ausências',
+          '• ``!painel-ponto`` ou ``/painelponto`` — Bate-Ponto Eletrônico\n',
+          '**Comandos Rápidos:**',
+          '• ``!tabela`` ou ``/tabela`` — Tabela de Preços de Serviços',
+          '• ``/minhasadvs`` — Consulta suas advertências ativas',
+          '• ``/verificarvencidas`` — Checa ausências expiradas',
+          '• ``/demitir`` — Exonera membro da facção (Líder)'
+        ].join('\n'))
+        .setFooter({ text: CONFIG.visual.rodape || 'LS Customs' });
 
-    return message.channel.send({ embeds: [embedAjuda] });
+      return await message.channel.send({ embeds: [embedAjuda] });
+    }
+  } catch (err) {
+    console.error('Erro ao processar comando por prefixo:', err.message);
   }
 });
 
@@ -725,7 +719,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ButtonBuilder().setCustomId('btn_solicitar_set_recruta').setLabel('🔰 Solicitar Set de Recruta').setStyle(ButtonStyle.Success),
           new ButtonBuilder().setCustomId('btn_iniciar_recrutamento').setLabel('📝 Formulário Completo').setStyle(ButtonStyle.Secondary)
         );
-        return interaction.reply({ embeds: [EmbedFactory.painelRecrutamento()], components: [row] });
+        return await interaction.reply({ embeds: [EmbedFactory.painelRecrutamento()], components: [row] });
       }
 
       if (commandName === 'paineladv') {
@@ -733,7 +727,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ButtonBuilder().setCustomId('btn_abrir_modal_adv').setLabel('⚠️ Aplicar Advertência').setStyle(ButtonStyle.Danger),
           new ButtonBuilder().setCustomId('btn_consultar_minhas_advs').setLabel('📋 Minhas Advertências').setStyle(ButtonStyle.Secondary)
         );
-        return interaction.reply({ embeds: [EmbedFactory.painelAdv()], components: [row] });
+        return await interaction.reply({ embeds: [EmbedFactory.painelAdv()], components: [row] });
       }
 
       if (commandName === 'painelausencia') {
@@ -741,7 +735,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ButtonBuilder().setCustomId('btn_abrir_modal_ausencia').setLabel('🌴 Solicitar Ausência').setStyle(ButtonStyle.Primary),
           new ButtonBuilder().setCustomId('btn_informar_retorno_ausencia').setLabel('↩️ Informar Retorno').setStyle(ButtonStyle.Success)
         );
-        return interaction.reply({ embeds: [EmbedFactory.painelAusencia()], components: [row] });
+        return await interaction.reply({ embeds: [EmbedFactory.painelAusencia()], components: [row] });
       }
 
       if (commandName === 'painelponto') {
@@ -750,19 +744,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ButtonBuilder().setCustomId('btn_ponto_finalizar').setLabel('🔴 Finalizar Serviço').setStyle(ButtonStyle.Danger),
           new ButtonBuilder().setCustomId('btn_ponto_consultar').setLabel('📊 Minhas Horas').setStyle(ButtonStyle.Primary)
         );
-        return interaction.reply({ embeds: [EmbedFactory.painelPonto()], components: [row] });
+        return await interaction.reply({ embeds: [EmbedFactory.painelPonto()], components: [row] });
       }
 
       if (commandName === 'tabela') {
-        return interaction.reply({ embeds: [EmbedFactory.tabelaPrecos()] });
+        return await interaction.reply({ embeds: [EmbedFactory.tabelaPrecos()] });
       }
 
       if (commandName === 'minhasadvs') {
         const userAdv = db.getAdv(interaction.user.id);
         if (!userAdv || userAdv.pontos === 0) {
-          return interaction.reply({ content: '🎉 Parabéns! Você possui **0 advertências** ativas na LS Customs.', ephemeral: true });
+          return await interaction.reply({ content: '🎉 Parabéns! Você possui **0 advertências** ativas na LS Customs.', ephemeral: true });
         }
-        return interaction.reply({
+        return await interaction.reply({
           content: `📊 Seu status disciplinar: **${userAdv.pontos}/3 Pontos** (${userAdv.totalAdvs} advertência(s) registrada(s)).`,
           ephemeral: true
         });
@@ -771,14 +765,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (commandName === 'verificarvencidas') {
         await interaction.deferReply({ ephemeral: true });
         await verificarAusenciasVencidas(client);
-        return interaction.editReply({ content: '✅ Verificação de ausências executada com sucesso!' });
+        return await interaction.editReply({ content: '✅ Verificação de ausências executada com sucesso!' });
       }
 
       if (commandName === 'demitir') {
-        const isLeader = interaction.member.roles.cache.has(CONFIG.cargos.lideranca) || 
-                         interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-        if (!isLeader) {
-          return interaction.reply({ content: '❌ Apenas a Liderança pode demitir membros.', ephemeral: true });
+        if (!checkIsLeader(interaction.member)) {
+          return await interaction.reply({ content: '❌ Apenas a Liderança pode demitir membros.', ephemeral: true });
         }
 
         const membroAlvo = interaction.options.getUser('membro');
@@ -786,11 +778,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const motivo = interaction.options.getString('motivo');
 
         await processarDemissao(interaction.guild, membroAlvo.id, passaporte, motivo, interaction.user.tag);
-        return interaction.reply({ content: `✅ O funcionário <@${membroAlvo.id}> foi exonerado com sucesso!`, ephemeral: true });
+        return await interaction.reply({ content: `✅ O funcionário <@${membroAlvo.id}> foi exonerado com sucesso!`, ephemeral: true });
       }
 
       if (commandName === 'ajuda') {
-        return interaction.reply({
+        return await interaction.reply({
           embeds: [
             new EmbedBuilder()
               .setColor(CONFIG.visual.corPrincipal)
@@ -817,14 +809,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isButton()) {
       const { customId } = interaction;
 
-      // 1. Solicitar Set de Recruta Rápido (2 Campos)
+      // 1. Set de Recruta Rápido (2 Campos)
       if (customId === 'btn_solicitar_set_recruta') {
         const modal = new ModalBuilder().setCustomId('modal_set_recruta').setTitle('🔰 Solicitar Set de Recruta');
         modal.addComponents(
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('set_nome').setLabel('1️⃣ Nome e Sobrenome In-Game').setPlaceholder('Ex: Xavi Souza').setStyle(TextInputStyle.Short).setRequired(true)),
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('set_passaporte').setLabel('2️⃣ Passaporte / ID In-Game').setPlaceholder('Ex: 846').setStyle(TextInputStyle.Short).setRequired(true))
         );
-        return interaction.showModal(modal);
+        return await interaction.showModal(modal);
       }
 
       // 2. Formulário Completo de Recrutamento (5 Campos)
@@ -837,15 +829,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('rec_exp').setLabel('Experiência Prévia').setStyle(TextInputStyle.Paragraph).setRequired(true)),
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('rec_motivo').setLabel('Por que a LS Customs?').setStyle(TextInputStyle.Paragraph).setRequired(true))
         );
-        return interaction.showModal(modal);
+        return await interaction.showModal(modal);
       }
 
-      // 3. Abrir Modal de Advertência (Liderança)
+      // 3. Abrir Modal de Advertência
       if (customId === 'btn_abrir_modal_adv') {
-        const isLeader = interaction.member.roles.cache.has(CONFIG.cargos.lideranca) || 
-                         interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-        if (!isLeader) {
-          return interaction.reply({ content: '❌ Apenas a Liderança pode aplicar advertências disciplinares.', ephemeral: true });
+        if (!checkIsLeader(interaction.member)) {
+          return await interaction.reply({ content: '❌ Apenas a Liderança pode aplicar advertências disciplinares.', ephemeral: true });
         }
 
         const modal = new ModalBuilder().setCustomId('modal_aplicar_adv').setTitle('⚠️ Aplicar Advertência');
@@ -856,13 +846,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('adv_motivo').setLabel('Motivo da Punição').setStyle(TextInputStyle.Paragraph).setRequired(true)),
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('adv_provas').setLabel('Link de Provas (Opcional)').setStyle(TextInputStyle.Short).setRequired(false))
         );
-        return interaction.showModal(modal);
+        return await interaction.showModal(modal);
       }
 
       // 4. Consultar Minhas Advertências
       if (customId === 'btn_consultar_minhas_advs') {
         const userAdv = db.getAdv(interaction.user.id);
-        return interaction.reply({
+        return await interaction.reply({
           content: `📊 Seu status disciplinar: **${userAdv.pontos}/3 Pontos** (${userAdv.totalAdvs} advertência(s)).`,
           ephemeral: true
         });
@@ -877,24 +867,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('aus_dias').setLabel('Quantidade de Dias (Máx: 5)').setPlaceholder('1 a 5').setStyle(TextInputStyle.Short).setRequired(true)),
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('aus_motivo').setLabel('Motivo da Ausência').setStyle(TextInputStyle.Paragraph).setRequired(true))
         );
-        return interaction.showModal(modal);
+        return await interaction.showModal(modal);
       }
 
       // 6. Informar Retorno de Ausência
       if (customId === 'btn_informar_retorno_ausencia') {
         const registro = db.getAusencia(interaction.user.id);
         if (!registro || registro.status !== 'ATIVA') {
-          return interaction.reply({ content: 'ℹ️ Você não possui nenhuma ausência ativa no momento.', ephemeral: true });
+          return await interaction.reply({ content: 'ℹ️ Você não possui nenhuma ausência ativa no momento.', ephemeral: true });
         }
 
         registro.status = 'FINALIZADA';
         db.salvar();
 
-        if (CONFIG.cargos.ausente && interaction.member.roles.cache.has(CONFIG.cargos.ausente)) {
+        if (CONFIG.cargos.ausente && interaction.member?.roles?.cache?.has?.(CONFIG.cargos.ausente)) {
           interaction.member.roles.remove(CONFIG.cargos.ausente).catch(() => null);
         }
 
-        const canalLogs = interaction.guild.channels.cache.get(CONFIG.canais.logsAusencia);
+        const canalLogs = interaction.guild?.channels?.cache?.get(CONFIG.canais.logsAusencia);
         if (canalLogs) {
           const retEmbed = new EmbedBuilder()
             .setColor(CONFIG.visual.corPrincipal)
@@ -904,7 +894,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           canalLogs.send({ embeds: [retEmbed] }).catch(() => null);
         }
 
-        return interaction.reply({ content: '✅ Seu retorno foi registrado com sucesso! Bom trabalho.', ephemeral: true });
+        return await interaction.reply({ content: '✅ Seu retorno foi registrado com sucesso! Bom trabalho.', ephemeral: true });
       }
 
       // 7. Bate-Ponto: Entrar em Serviço
@@ -912,7 +902,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const uId = interaction.user.id;
         const p = db.getPonto(uId);
         if (p.status === 'EM_SERVICO') {
-          return interaction.reply({ content: '⚠️ Você já está com ponto aberto em andamento!', ephemeral: true });
+          return await interaction.reply({ content: '⚠️ Você já está com ponto aberto em andamento!', ephemeral: true });
         }
 
         db.setPonto(uId, {
@@ -921,7 +911,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           totalSegundos: (p.totalSegundos || 0)
         });
 
-        const canalLogs = interaction.guild.channels.cache.get(CONFIG.canais.logsPonto) || interaction.guild.channels.cache.get(CONFIG.canais.ponto);
+        const canalLogs = interaction.guild?.channels?.cache?.get(CONFIG.canais.logsPonto) || interaction.guild?.channels?.cache?.get(CONFIG.canais.ponto);
         if (canalLogs) {
           const embed = new EmbedBuilder()
             .setColor(CONFIG.visual.corPrincipal)
@@ -931,7 +921,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           canalLogs.send({ embeds: [embed] }).catch(() => null);
         }
 
-        return interaction.reply({ content: '🟢 **Ponto aberto com sucesso!** Tenha um ótimo plantão.', ephemeral: true });
+        return await interaction.reply({ content: '🟢 **Ponto aberto com sucesso!** Tenha um ótimo plantão.', ephemeral: true });
       }
 
       // 8. Bate-Ponto: Finalizar Serviço
@@ -939,7 +929,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const uId = interaction.user.id;
         const p = db.getPonto(uId);
         if (p.status !== 'EM_SERVICO') {
-          return interaction.reply({ content: 'ℹ️ Você não tem nenhum ponto aberto para encerrar.', ephemeral: true });
+          return await interaction.reply({ content: 'ℹ️ Você não tem nenhum ponto aberto para encerrar.', ephemeral: true });
         }
 
         const duracao = Math.floor((Date.now() - p.inicioTimestamp) / 1000);
@@ -950,7 +940,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         p.status = 'FINALIZADO';
         db.setPonto(uId, p);
 
-        const canalLogs = interaction.guild.channels.cache.get(CONFIG.canais.logsPonto) || interaction.guild.channels.cache.get(CONFIG.canais.ponto);
+        const canalLogs = interaction.guild?.channels?.cache?.get(CONFIG.canais.logsPonto) || interaction.guild?.channels?.cache?.get(CONFIG.canais.ponto);
         if (canalLogs) {
           const embed = new EmbedBuilder()
             .setColor(CONFIG.visual.corPerigo)
@@ -960,7 +950,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           canalLogs.send({ embeds: [embed] }).catch(() => null);
         }
 
-        return interaction.reply({ content: `🔴 **Ponto finalizado!** Você trabalhou **${horas}h ${mins}min** neste turno.`, ephemeral: true });
+        return await interaction.reply({ content: `🔴 **Ponto finalizado!** Você trabalhou **${horas}h ${mins}min** neste turno.`, ephemeral: true });
       }
 
       // 9. Bate-Ponto: Consultar Horas
@@ -971,7 +961,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const m = Math.floor((seg % 3600) / 60);
         const status = p.status === 'EM_SERVICO' ? '🟢 Em Serviço' : '🔴 Fora de Serviço';
 
-        return interaction.reply({
+        return await interaction.reply({
           content: `📊 **Seu Histórico de Ponto:**\n• Status: ${status}\n• Total de Horas Acumuladas: **${h}h ${m}min**`,
           ephemeral: true
         });
@@ -980,14 +970,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
       // 10. Recrutamento: Aprovação pela Liderança
       if (customId.startsWith('rec_aprovar_')) {
         const candId = customId.replace('rec_aprovar_', '');
-        const isLeader = interaction.member.roles.cache.has(CONFIG.cargos.lideranca) || 
-                         interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-
-        if (!isLeader) {
-          return interaction.reply({ content: '❌ Apenas a Liderança pode aprovar candidatos.', ephemeral: true });
+        if (!checkIsLeader(interaction.member)) {
+          return await interaction.reply({ content: '❌ Apenas a Liderança pode aprovar candidatos.', ephemeral: true });
         }
 
-        const member = await interaction.guild.members.fetch(candId).catch(() => null);
+        const member = await interaction.guild?.members?.fetch(candId).catch(() => null);
         const candDados = db.data.recrutamentos[candId] || { nomeRP: 'Mecânico', passaporte: '000' };
 
         let statusNick = '✅ Alterado com sucesso';
@@ -1001,7 +988,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
             statusNick = '⚠️ Sem permissão para alterar apelido';
           }
           try {
-            if (CONFIG.cargos.recruta) await member.roles.add(CONFIG.cargos.recruta);
+            if (CONFIG.cargos.recruta && interaction.guild.roles.cache.has(CONFIG.cargos.recruta)) {
+              await member.roles.add(CONFIG.cargos.recruta);
+            }
           } catch (e) {
             statusCargo = '⚠️ Sem permissão para gerenciar cargo';
           }
@@ -1016,16 +1005,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
           statusCargo
         });
 
-        await interaction.update({ embeds: [embedAprovado], components: [] });
+        return await interaction.update({ embeds: [embedAprovado], components: [] });
       }
 
       // 11. Recrutamento: Reprovação
       if (customId.startsWith('rec_reprovar_')) {
-        const isLeader = interaction.member.roles.cache.has(CONFIG.cargos.lideranca) || 
-                         interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
-
-        if (!isLeader) {
-          return interaction.reply({ content: '❌ Apenas a Liderança pode reprovar.', ephemeral: true });
+        if (!checkIsLeader(interaction.member)) {
+          return await interaction.reply({ content: '❌ Apenas a Liderança pode reprovar.', ephemeral: true });
         }
 
         const origEmbed = EmbedBuilder.from(interaction.message.embeds[0])
@@ -1033,7 +1019,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setTitle('❌ CANDIDATURA REPROVADA')
           .setFooter({ text: `Reprovado por ${interaction.user.tag}` });
 
-        await interaction.update({ embeds: [origEmbed], components: [] });
+        return await interaction.update({ embeds: [origEmbed], components: [] });
       }
     }
 
@@ -1050,7 +1036,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const val = validarCandidatura({ nome, passaporte });
         if (!val.valido) {
-          return interaction.reply({ content: `⚠️ **Dados Inválidos:** ${val.motivo}`, ephemeral: true });
+          return await interaction.reply({ content: `⚠️ **Dados Inválidos:** ${val.motivo}`, ephemeral: true });
         }
 
         const member = interaction.member;
@@ -1059,12 +1045,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const novoNick = `|Recruta| ${val.nome} | #${val.passaporte}`;
         try {
-          await member.setNickname(novoNick);
+          if (member && typeof member.setNickname === 'function') {
+            await member.setNickname(novoNick);
+          }
         } catch (e) {
           statusNick = '⚠️ Sem permissão para alterar apelido';
         }
         try {
-          if (CONFIG.cargos.recruta) await member.roles.add(CONFIG.cargos.recruta);
+          if (member && CONFIG.cargos.recruta && interaction.guild.roles.cache.has(CONFIG.cargos.recruta)) {
+            await member.roles.add(CONFIG.cargos.recruta);
+          }
         } catch (e) {
           statusCargo = '⚠️ Sem permissão para gerenciar cargo';
         }
@@ -1078,10 +1068,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           statusCargo
         });
 
-        const canalLogs = interaction.guild.channels.cache.get(CONFIG.canais.logsRecrutamento) || interaction.channel;
+        const canalLogs = interaction.guild?.channels?.cache?.get(CONFIG.canais.logsRecrutamento) || interaction.channel;
         if (canalLogs) canalLogs.send({ embeds: [embedAprovado] }).catch(() => null);
 
-        return interaction.reply({
+        return await interaction.reply({
           content: `🎉 **Set de Recruta concluído com sucesso!** Bem-vindo, **${novoNick}**!`,
           embeds: [embedAprovado],
           ephemeral: true
@@ -1098,7 +1088,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const val = validarCandidatura({ nome, passaporte, idadeDisp, exp, motivo });
         if (!val.valido) {
-          return interaction.reply({ content: `⚠️ ${val.motivo}`, ephemeral: true });
+          return await interaction.reply({ content: `⚠️ ${val.motivo}`, ephemeral: true });
         }
 
         db.setRecrutamento(interaction.user.id, {
@@ -1107,7 +1097,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           status: 'PENDENTE'
         });
 
-        const canalLogs = interaction.guild.channels.cache.get(CONFIG.canais.logsRecrutamento);
+        const canalLogs = interaction.guild?.channels?.cache?.get(CONFIG.canais.logsRecrutamento);
         if (canalLogs) {
           const logEmbed = new EmbedBuilder()
             .setColor(CONFIG.visual.corPrincipal)
@@ -1131,7 +1121,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await canalLogs.send({ embeds: [logEmbed], components: [row] }).catch(() => null);
         }
 
-        return interaction.reply({ content: '✅ **Sua candidatura foi enviada com sucesso!** A liderança avaliará em breve.', ephemeral: true });
+        return await interaction.reply({ content: '✅ **Sua candidatura foi enviada com sucesso!** A liderança avaliará em breve.', ephemeral: true });
       }
 
       // 3. Modal: Aplicar Advertência (Canal 1536304172952191049)
@@ -1147,7 +1137,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         else if (grauInput.includes('GRAV') || grauInput === '3') tipo = 'GRAVE';
 
         if (!userInput) {
-          return interaction.reply({ content: '❌ ID de usuário Discord inválido!', ephemeral: true });
+          return await interaction.reply({ content: '❌ ID de usuário Discord inválido!', ephemeral: true });
         }
 
         await processarAdvertencia(
@@ -1160,7 +1150,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           interaction.user.tag
         );
 
-        return interaction.reply({
+        return await interaction.reply({
           content: `✅ Advertência **${tipo}** aplicada com sucesso ao usuário <@${userInput}>!`,
           ephemeral: true
         });
@@ -1175,7 +1165,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const diasNum = parseInt(diasStr, 10) || 1;
         if (diasNum < 1 || diasNum > 5) {
-          return interaction.reply({ content: '❌ O prazo de ausência deve ser entre **1 e 5 dias** corridos!', ephemeral: true });
+          return await interaction.reply({ content: '❌ O prazo de ausência deve ser entre **1 e 5 dias** corridos!', ephemeral: true });
         }
 
         const agora = Date.now();
@@ -1192,11 +1182,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
           status: 'ATIVA'
         });
 
-        if (CONFIG.cargos.ausente) {
+        if (CONFIG.cargos.ausente && interaction.guild.roles.cache.has(CONFIG.cargos.ausente)) {
           interaction.member.roles.add(CONFIG.cargos.ausente).catch(() => null);
         }
 
-        const canalLogs = interaction.guild.channels.cache.get(CONFIG.canais.logsAusencia);
+        const canalLogs = interaction.guild?.channels?.cache?.get(CONFIG.canais.logsAusencia);
         if (canalLogs) {
           const dataVenc = new Date(vencimento).toLocaleDateString('pt-BR');
           const embed = new EmbedBuilder()
@@ -1214,11 +1204,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
           canalLogs.send({ embeds: [embed] }).catch(() => null);
         }
 
-        return interaction.reply({ content: `✅ Ausência registrada para **${diasNum} dia(s)** com sucesso!`, ephemeral: true });
+        return await interaction.reply({ content: `✅ Ausência registrada para **${diasNum} dia(s)** com sucesso!`, ephemeral: true });
       }
     }
   } catch (err) {
-    console.error('⚠️ [INTERACTION] Erro ao processar interação:', err);
+    console.error('⚠️ [INTERACTION] Erro ao processar interação:', err.message);
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+      interaction.reply({ content: '❌ Ocorreu um erro ao processar esta ação. Verifique as permissões do bot.', ephemeral: true }).catch(() => null);
+    }
   }
 });
 
@@ -1246,4 +1239,7 @@ server.listen(CONFIG.port, '0.0.0.0', () => {
 });
 
 // Iniciar Cliente Discord
-client.login(CONFIG.token);
+client.login(CONFIG.token).catch(err => {
+  console.error('❌ ERRO CRÍTICO AO LOGAR O BOT NO DISCORD:', err.message);
+  console.error('👉 Verifique se você colocou o DISCORD_TOKEN correto no arquivo .env!');
+});
