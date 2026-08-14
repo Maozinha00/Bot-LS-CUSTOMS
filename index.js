@@ -245,8 +245,8 @@ client.on(Events.GuildMemberAdd, async (member) => {
         .setTitle('📥 NOVO INTEGRANTE NO SERVIDOR — LS CUSTOMS')
         .setDescription(
           `👋 **Boas-vindas à oficina mecânica LS CUSTOMS!**\n\n` +
-          `👤 **Membro:** ${member.user} (`${member.user.tag}`)\n` +
-          `🆔 **ID Discord:** `${member.user.id}`\n` +
+          `👤 **Membro:** ${member.user} (${member.user.tag})\n` +
+          `🆔 **ID Discord:** \`${member.user.id}\`\n` +
           `📅 **Conta criada:** <t:${createdSecs}:R> (<t:${createdSecs}:f>)\n` +
           `👥 **Total de Membros no Servidor:** **${member.guild.memberCount}**\n\n` +
           `📌 *Acesse o canal de recrutamento e preencha o formulário para se tornar um mecânico oficial!*`
@@ -274,8 +274,8 @@ client.on(Events.GuildMemberRemove, async (member) => {
         .setTitle('📤 MEMBRO SAIU DO SERVIDOR — LS CUSTOMS')
         .setDescription(
           `🚪 **Um integrante saiu da oficina mecânica.**\n\n` +
-          `👤 **Membro:** ${member.user} (`${member.user.tag}`)\n` +
-          `🆔 **ID Discord:** `${member.user.id}`\n` +
+          `👤 **Membro:** ${member.user} (${member.user.tag})\n` +
+          `🆔 **ID Discord:** \`${member.user.id}\`\n` +
           `👥 **Total Restante:** **${member.guild.memberCount} membros**`
         )
         .setColor(CONFIG_LS.corAlerta)
@@ -348,11 +348,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle('🌴 Novo Registro de Ausência • LS CUSTOMS')
         .setDescription(
           `Um mecânico acaba de registrar uma ausência/folga oficial no sistema.\n\n` +
-          `👤 **Membro:** <@${interaction.user.id}> (`${interaction.user.tag}`)\n` +
-          `🆔 **ID Discord:** `${interaction.user.id}`\n` +
-          `📅 **Data de Início:** `${inicio}`\n` +
-          `🔄 **Previsão de Retorno:** `${retorno}`\n\n` +
-          `📝 **Motivo Declarado:**\n```${motivo}````
+          `👤 **Membro:** <@${interaction.user.id}> (${interaction.user.tag})\n` +
+          `🆔 **ID Discord:** \`${interaction.user.id}\`\n` +
+          `📅 **Data de Início:** \`${inicio}\`\n` +
+          `🔄 **Previsão de Retorno:** \`${retorno}\`\n\n` +
+          `📝 **Motivo Declarado:**\n\`\`\`\n${motivo}\n\`\`\``
         )
         .setImage(CONFIG_LS.bannerUrl)
         .setFooter({ text: CONFIG_LS.rodape })
@@ -546,7 +546,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             `⏰ **6. Disponibilidade**: ${disponibilidade}\n` +
             `📜 **7. Aceita Regras & Ponto**: ${regras}\n` +
             `🤝 **8. Resolução de Conflitos**: ${situacao}\n\n` +
-            `🎮 **DISCORD**: <@${interaction.user.id}> (`${interaction.user.tag}`)\n` +
+            `🎮 **DISCORD**: <@${interaction.user.id}> (${interaction.user.tag})\n` +
             `🏷️ **NICK SUGERIDO**: \`${novoNick}\``
           )
           .setColor('#F1C40F')
