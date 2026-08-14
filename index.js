@@ -77,6 +77,7 @@ const CONFIG_LS = {
 const userAdvsCount = new Map(); // memberId ou RG -> total de advs
 const activeAbsences = new Map(); // memberId -> { startDate, returnDate, dias, reason, status, advAplicada }
 const pontoRecords = new Map(); // memberId -> { lastPontoTime, startTime, isWorking }
+const candidatosRecrutamento = new Map(); // userId -> { nome, passaporte, idadeDisp, experiencia, motivoRegras, dataEnvio }
 
 // ============================================================================
 // 🛡️ 3. VALIDAÇÃO INTELIGENTE ANTI-TROLL
@@ -923,11 +924,75 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
 
-      // 7. APROVAR RECRUTA
+      // 7. APROVAR RECRUTA E APLICAR TAG |R| Nome | ID
       if (customId.startsWith('aprovar_rec_')) {
-        const userId = customId.replace('aprovar_rec_', '');
+        const userId = customId.replace('aprovar_rec_', '').split('_')[0];
+
+        let candData = candidatosRecrutamento.get(userId);
+        let nomeRecruta = candData ? candData.nome : null;
+        let idPassaporte = candData ? candData.passaporte : null;
+
+        // Se não estiver na memória (ex: reinício), recupera do embed original
+        if ((!nomeRecruta || !idPassaporte) && interaction.message && interaction.message.embeds && interaction.message.embeds.length > 0) {
+          const desc = interaction.message.embeds[0].description || '';
+          const nomeMatch = desc.match(/Nome do Personagem:s*([^
+
+]+)/i) || desc.match(/Nome:s*([^
+
+]+)/i);
+          const passMatch = desc.match(/Passaporte:s*#?([^
+
+]+)/i) || desc.match(/ID:s*#?([^
+
+]+)/i);
+          if (nomeMatch && nomeMatch[1]) nomeRecruta = nomeMatch[1].trim();
+          if (passMatch && passMatch[1]) idPassaporte = passMatch[1].trim();
+        }
+
+        const tagOficial = `|R| ${nomeRecruta || 'Membro'} | ${idPassaporte || userId}`;
+        let apelidoAlterado = false;
+
+        if (interaction.guild) {
+          try {
+            const member = await interaction.guild.members.fetch(userId).catch(() => null);
+            if (member) {
+              await member.setNickname(tagOficial);
+              apelidoAlterado = true;
+            }
+          } catch (err) {
+            console.warn(`⚠️ Não foi possível alterar o apelido de ${userId}:`, err && err.message ? err.message : err);
+          }
+        }
+
+        // Desabilita os botões na mensagem original
+        const updatedRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`rec_done_aprovado_${userId}`)
+            .setLabel(`✅ Aprovado por ${interaction.user.username}`)
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(true)
+        );
+
+        await interaction.message.edit({ components: [updatedRow] }).catch(() => null);
+
+        const aprovadoEmbed = new EmbedBuilder()
+          .setColor('#2ECC71')
+          .setTitle('🎉 CANDIDATURA APROVADA — LS CUSTOMS')
+          .setDescription(
+            `👤 **Novo Recruta:** <@${userId}>\n` +
+            `📝 **Nome:** ${nomeRecruta || 'Registrado'}\n` +
+            `🆔 **Passaporte / ID:** #${idPassaporte || userId}\n` +
+            `👑 **Aprovado por:** <@${interaction.user.id}> (${interaction.user.tag})\n` +
+            `🏷️ **Tag Oficial Configurada:** \`${tagOficial}\`\n\n` +
+            (apelidoAlterado
+              ? `✨ **Apelido no Discord alterado com sucesso para:** \`${tagOficial}\``
+              : `⚠️ **Aviso de Permissão:** A tag oficial definida é \`${tagOficial}\`.\n*(Para o bot alterar o apelido automaticamente, garanta que o cargo do bot esteja no topo e com a permissão "Gerenciar Apelidos")*`)
+          )
+          .setFooter({ text: CONFIG_LS.rodape })
+          .setTimestamp();
+
         await interaction.reply({
-          content: `✅ Candidatura de <@${userId}> foi **Aprovada** por <@${interaction.user.id}>! Seja bem-vindo à LS Customs!`,
+          embeds: [aprovadoEmbed],
           ephemeral: false
         });
         return;
@@ -935,7 +1000,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       // 8. RECUSAR RECRUTA
       if (customId.startsWith('recusar_rec_')) {
-        const userId = customId.replace('recusar_rec_', '');
+        const userId = customId.replace('recusar_rec_', '').split('_')[0];
+
+        const updatedRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`rec_done_recusado_${userId}`)
+            .setLabel(`❌ Recusado por ${interaction.user.username}`)
+            .setStyle(ButtonStyle.Danger)
+            .setDisabled(true)
+        );
+
+        await interaction.message.edit({ components: [updatedRow] }).catch(() => null);
+
         await interaction.reply({
           content: `❌ Candidatura de <@${userId}> foi **Recusada** por <@${interaction.user.id}>.`,
           ephemeral: false
@@ -996,6 +1072,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return;
         }
 
+        // Salva dados em memória para aplicação da Tag |R| Nome | ID ao aprovar
+        candidatosRecrutamento.set(interaction.user.id, {
+          nome: nome.trim(),
+          passaporte: passaporte.trim(),
+          idadeDisp: idadeDisp.trim(),
+          experiencia: experiencia.trim(),
+          motivoRegras: motivoRegras.trim(),
+          dataEnvio: new Date()
+        });
+
+        const tagPreview = `|R| ${nome.trim()} | ${passaporte.trim()}`;
+
         const canalLogs = client.channels.cache.get(CONFIG_LS.canalLogsRecrutamentoId);
         if (canalLogs) {
           const fichaEmbed = new EmbedBuilder()
@@ -1003,7 +1091,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setTitle('📋 NOVA CANDIDATURA DE RECRUTAMENTO')
             .setDescription(
               `👤 **Candidato:** <@${interaction.user.id}> (${interaction.user.tag})\n` +
+              `📝 **Nome do Personagem:** ${nome}\n` +
               `🆔 **Passaporte:** #${passaporte}\n` +
+              `🏷️ **Tag Oficial após Aprovação:** \`${tagPreview}\`\n` +
               `🎂 **Idade & Horários:** ${idadeDisp}\n` +
               `🔧 **Experiência Prévia:** ${experiencia}\n\n` +
               `🎯 **Motivo de Entrada & Regras:**\n${motivoRegras}`
@@ -1014,7 +1104,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
           const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
               .setCustomId(`aprovar_rec_${interaction.user.id}`)
-              .setLabel('✅ Aprovar Candidato')
+              .setLabel('✅ Aprovar & Setar Tag |R|')
               .setStyle(ButtonStyle.Success),
             new ButtonBuilder()
               .setCustomId(`recusar_rec_${interaction.user.id}`)
@@ -1026,7 +1116,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         await interaction.reply({
-          content: '✅ **Candidatura enviada com sucesso!**\nA Liderança da **LS Customs** analisará suas respostas.',
+          content: `✅ **Candidatura enviada com sucesso!**\nA Liderança da **LS Customs** analisará suas respostas.\n🏷️ Tag configurada para aprovação: \`${tagPreview}\``,
           ephemeral: true
         });
         return;
