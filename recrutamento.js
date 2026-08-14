@@ -5,16 +5,34 @@
  * ============================================================================
  */
 
-const { 
-  EmbedBuilder, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
-  ButtonStyle, 
-  ModalBuilder, 
-  TextInputBuilder, 
-  TextInputStyle 
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle
 } = require('discord.js');
+
 const { db, configLS } = require('./database');
+
+/**
+ * ============================================================================
+ * ⚙️ CONFIGURAÇÕES DO RECRUTAMENTO
+ * ============================================================================
+ */
+
+const CARGOS_RECRUTAMENTO = [
+  '1536304132980473896',
+  '1537151042888671365'
+];
+
+/**
+ * ============================================================================
+ * 📋 PAINEL DE RECRUTAMENTO
+ * ============================================================================
+ */
 
 function gerarPainelRecrutamento() {
   const embed = new EmbedBuilder()
@@ -29,8 +47,10 @@ function gerarPainelRecrutamento() {
       '• Cumprir metas semanais e pontualidade.\n\n' +
       'Clique no botão abaixo para preencher sua ficha de inscrição oficial.'
     )
-.setImage('https://i.imgur.com/Vv2juos.jpeg')
-    .setFooter({ text: 'LS Customs • Recrutamento' });
+    .setImage('https://i.imgur.com/Vv2juos.jpeg')
+    .setFooter({
+      text: 'LS Customs • Recrutamento'
+    });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -39,8 +59,17 @@ function gerarPainelRecrutamento() {
       .setStyle(ButtonStyle.Success)
   );
 
-  return { embeds: [embed], components: [row] };
+  return {
+    embeds: [embed],
+    components: [row]
+  };
 }
+
+/**
+ * ============================================================================
+ * 📝 ABRIR MODAL DE RECRUTAMENTO
+ * ============================================================================
+ */
 
 async function abrirModalRecrutamento(interaction) {
   const modal = new ModalBuilder()
@@ -51,7 +80,7 @@ async function abrirModalRecrutamento(interaction) {
     .setCustomId('rec_nome')
     .setLabel('Nome no Personagem (RP)')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('Ex:Henrique Souza')
+    .setPlaceholder('Ex: Henrique Souza')
     .setRequired(true);
 
   const inputId = new TextInputBuilder()
@@ -93,12 +122,39 @@ async function abrirModalRecrutamento(interaction) {
   await interaction.showModal(modal);
 }
 
+/**
+ * ============================================================================
+ * 📥 PROCESSAR FICHA
+ * ============================================================================
+ */
+
 async function processarFichaRecrutamento(interaction, client) {
-  const nome = interaction.fields.getTextInputValue('rec_nome').trim();
-  const passaporte = interaction.fields.getTextInputValue('rec_passaporte').replace('#', '').trim();
-  const idadeDisp = interaction.fields.getTextInputValue('rec_idade_disp').trim();
-  const exp = interaction.fields.getTextInputValue('rec_exp').trim();
-  const motivo = interaction.fields.getTextInputValue('rec_motivo').trim();
+  const nome = interaction.fields
+    .getTextInputValue('rec_nome')
+    .trim();
+
+  const passaporte = interaction.fields
+    .getTextInputValue('rec_passaporte')
+    .replace('#', '')
+    .trim();
+
+  const idadeDisp = interaction.fields
+    .getTextInputValue('rec_idade_disp')
+    .trim();
+
+  const exp = interaction.fields
+    .getTextInputValue('rec_exp')
+    .trim();
+
+  const motivo = interaction.fields
+    .getTextInputValue('rec_motivo')
+    .trim();
+
+  /**
+   * ==========================================================================
+   * 💾 SALVAR CANDIDATO
+   * ==========================================================================
+   */
 
   db.candidatos.set(interaction.user.id, {
     userId: interaction.user.id,
@@ -111,7 +167,16 @@ async function processarFichaRecrutamento(interaction, client) {
     dataEnvio: new Date()
   });
 
-  const canalLogs = client.channels.cache.get(configLS.canalLogsRecrutamentoId);
+  /**
+   * ==========================================================================
+   * 📢 ENVIAR PARA CANAL DE LOGS
+   * ==========================================================================
+   */
+
+  const canalLogs = client.channels.cache.get(
+    configLS.canalLogsRecrutamentoId
+  );
+
   if (canalLogs) {
     const embedLog = new EmbedBuilder()
       .setColor('#3B82F6')
@@ -124,7 +189,9 @@ async function processarFichaRecrutamento(interaction, client) {
         `🛠️ **Experiência Prévia:**\n${exp}\n\n` +
         `💡 **Motivação:**\n${motivo}`
       )
-      .setFooter({ text: 'LS Customs • Avaliação de Staff' })
+      .setFooter({
+        text: 'LS Customs • Avaliação de Staff'
+      })
       .setTimestamp();
 
     const rowAcao = new ActionRowBuilder().addComponents(
@@ -132,59 +199,234 @@ async function processarFichaRecrutamento(interaction, client) {
         .setCustomId(`btn_rec_aprovar_${interaction.user.id}`)
         .setLabel('✅ Aprovar Candidato')
         .setStyle(ButtonStyle.Success),
+
       new ButtonBuilder()
         .setCustomId(`btn_rec_recusar_${interaction.user.id}`)
         .setLabel('❌ Recusar Candidato')
         .setStyle(ButtonStyle.Danger)
     );
 
-    await canalLogs.send({ embeds: [embedLog], components: [rowAcao] });
+    await canalLogs.send({
+      embeds: [embedLog],
+      components: [rowAcao]
+    });
   }
 
+  /**
+   * ==========================================================================
+   * ✅ RESPOSTA AO CANDIDATO
+   * ==========================================================================
+   */
+
   await interaction.reply({
-    content: `✅ **Ficha enviada com sucesso, ${nome}!** A liderança da LS Customs analisará seu formulário. Fique atento às suas notificações.`,
+    content:
+      `✅ **Ficha enviada com sucesso, ${nome}!**\n\n` +
+      `A liderança da LS Customs analisará seu formulário.\n` +
+      `Fique atento às suas notificações.`,
     ephemeral: true
   });
 }
 
+/**
+ * ============================================================================
+ * 🎯 TRATAR INTERAÇÕES
+ * ============================================================================
+ */
+
 async function tratarInteracaoRecrutamento(interaction, client) {
+
+  /**
+   * ==========================================================================
+   * 🔘 BOTÕES
+   * ==========================================================================
+   */
+
   if (interaction.isButton()) {
+
+    /**
+     * ------------------------------------------------------------------------
+     * 📝 ABRIR FICHA
+     * ------------------------------------------------------------------------
+     */
+
     if (interaction.customId === 'btn_rec_abrir_ficha') {
       return await abrirModalRecrutamento(interaction);
     }
 
+    /**
+     * ------------------------------------------------------------------------
+     * ✅ APROVAR CANDIDATO
+     * ------------------------------------------------------------------------
+     */
+
     if (interaction.customId.startsWith('btn_rec_aprovar_')) {
-      const targetId = interaction.customId.replace('btn_rec_aprovar_', '');
+
+      const targetId = interaction.customId.replace(
+        'btn_rec_aprovar_',
+        ''
+      );
+
       const cand = db.candidatos.get(targetId);
-      const apelido = cand ? `|R| ${cand.nome} | ${cand.passaporte}` : null;
+
+      const apelido = cand
+        ? `|R| ${cand.nome} | ${cand.passaporte}`
+        : '|R| Recruta';
 
       try {
-        const guild = interaction.guild;
-        const member = await guild.members.fetch(targetId).catch(() => null);
-        if (member && apelido) {
-          await member.setNickname(apelido).catch(() => null);
-        }
-      } catch (e) {}
 
-      await interaction.reply({
-        content: `✅ Candidato <@${targetId}> foi **APROVADO** por <@${interaction.user.id}>! Apelido formatado: \`${apelido || '|R| Recruta'}\`.`,
-      });
+        const guild = interaction.guild;
+
+        const member = await guild.members
+          .fetch(targetId)
+          .catch(() => null);
+
+        if (!member) {
+
+          return await interaction.reply({
+            content:
+              `❌ Não consegui encontrar o candidato <@${targetId}> no servidor.`,
+            ephemeral: true
+          });
+
+        }
+
+        /**
+         * --------------------------------------------------------------------
+         * 🏷️ ALTERAR APELIDO
+         * --------------------------------------------------------------------
+         */
+
+        try {
+
+          await member.setNickname(apelido);
+
+        } catch (erroNickname) {
+
+          console.error(
+            '❌ Erro ao alterar apelido:',
+            erroNickname
+          );
+
+        }
+
+        /**
+         * --------------------------------------------------------------------
+         * 🎖️ ADICIONAR CARGOS
+         * --------------------------------------------------------------------
+         */
+
+        try {
+
+          await member.roles.add(CARGOS_RECRUTAMENTO);
+
+          console.log(
+            `✅ Cargos adicionados para ${member.user.tag}`
+          );
+
+        } catch (erroCargo) {
+
+          console.error(
+            '❌ Erro ao adicionar cargos:',
+            erroCargo
+          );
+
+          return await interaction.reply({
+            content:
+              `⚠️ Candidato <@${targetId}> foi aprovado, ` +
+              `mas **não consegui adicionar os cargos**.\n\n` +
+              `Verifique se o cargo do bot está acima dos cargos de recrutamento ` +
+              `e se ele possui a permissão **Gerenciar Cargos**.\n\n` +
+              `🎖️ Cargos configurados:\n` +
+              `<@&1536304132980473896>\n` +
+              `<@&1537151042888671365>`,
+            ephemeral: true
+          });
+
+        }
+
+        /**
+         * --------------------------------------------------------------------
+         * 📢 CONFIRMAÇÃO
+         * --------------------------------------------------------------------
+         */
+
+        await interaction.reply({
+          content:
+            `✅ Candidato <@${targetId}> foi **APROVADO** por <@${interaction.user.id}>!\n\n` +
+            `🏷️ **Apelido:** \`${apelido}\`\n` +
+            `🎖️ **Cargos adicionados:**\n` +
+            `<@&1536304132980473896>\n` +
+            `<@&1537151042888671365>`
+        });
+
+      } catch (erro) {
+
+        console.error(
+          '❌ Erro geral ao aprovar candidato:',
+          erro
+        );
+
+        if (!interaction.replied) {
+
+          await interaction.reply({
+            content:
+              '❌ Ocorreu um erro ao aprovar o candidato. ' +
+              'Verifique o console do bot.',
+            ephemeral: true
+          });
+
+        }
+      }
+
       return;
     }
+
+    /**
+     * ------------------------------------------------------------------------
+     * ❌ RECUSAR CANDIDATO
+     * ------------------------------------------------------------------------
+     */
 
     if (interaction.customId.startsWith('btn_rec_recusar_')) {
-      const targetId = interaction.customId.replace('btn_rec_recusar_', '');
+
+      const targetId = interaction.customId.replace(
+        'btn_rec_recusar_',
+        ''
+      );
+
       await interaction.reply({
-        content: `❌ Candidato <@${targetId}> foi **RECUSADO** por <@${interaction.user.id}>.`,
+        content:
+          `❌ Candidato <@${targetId}> foi **RECUSADO** por <@${interaction.user.id}>.`
       });
+
       return;
     }
   }
 
-  if (interaction.isModalSubmit() && interaction.customId === 'modal_rec_ficha') {
-    return await processarFichaRecrutamento(interaction, client);
+  /**
+   * ==========================================================================
+   * 📝 MODAL DE CANDIDATURA
+   * ==========================================================================
+   */
+
+  if (
+    interaction.isModalSubmit() &&
+    interaction.customId === 'modal_rec_ficha'
+  ) {
+
+    return await processarFichaRecrutamento(
+      interaction,
+      client
+    );
+
   }
 }
+
+/**
+ * ============================================================================
+ * 📤 EXPORTAR FUNÇÕES
+ * ============================================================================
+ */
 
 module.exports = {
   gerarPainelRecrutamento,
