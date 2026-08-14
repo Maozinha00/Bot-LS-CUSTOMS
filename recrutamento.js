@@ -51,14 +51,14 @@ async function abrirModalRecrutamento(interaction) {
     .setCustomId('rec_nome')
     .setLabel('Nome no Personagem (RP)')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('Ex: Bruno Silva')
+    .setPlaceholder('Ex:Henrique Souza')
     .setRequired(true);
 
   const inputId = new TextInputBuilder()
     .setCustomId('rec_passaporte')
     .setLabel('Passaporte / ID na Cidade')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('Ex: 4589')
+    .setPlaceholder('Ex: 793')
     .setRequired(true);
 
   const inputIdadeDisp = new TextInputBuilder()
