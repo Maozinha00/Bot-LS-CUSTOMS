@@ -2,1059 +2,472 @@
  * ============================================================================
  * 🏁 LS CUSTOMS — SISTEMA COMPLETO DE EVENTOS AUTOMOTIVOS
  * ARQUIVO: eventos.js
- * CANAL DO EVENTO: 1537925623979319297
- * DISCORD.JS V14
+ * CANAL OFICIAL: 1537925623979319297
  * ============================================================================
  */
 
-const {
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle
+const { 
+  EmbedBuilder, 
+  ActionRowBuilder, 
+  ButtonBuilder, 
+  ButtonStyle, 
+  ModalBuilder, 
+  TextInputBuilder, 
+  TextInputStyle 
 } = require('discord.js');
-
 const { db, configLS } = require('./database');
 
-// ============================================================================
-// ⚙️ CONFIGURAÇÕES
-// ============================================================================
-
-const VALOR_INSCRICAO = 10000;
-
-const CARGO_STAFF = configLS.cargoStaffEventoId || null;
-
-// ============================================================================
-// 🧰 GARANTIR ESTRUTURA DO BANCO
-// ============================================================================
-
-if (!db.inscritosEvento) {
-  db.inscritosEvento = new Map();
-}
-
-if (!db.eventoConfig) {
-  db.eventoConfig = {
-    painelMessageId: null,
-    aberto: true,
-    primeiroLugar: null,
-    segundoLugar: null,
-    terceiroLugar: null
-  };
-}
-
-// ============================================================================
-// 🔐 VERIFICAR STAFF
-// ============================================================================
-
-function usuarioEhStaff(interaction) {
-  if (!interaction.member) return false;
-
-  // Se não configurou cargo específico,
-  // permite quem tiver ManageGuild.
-  if (!CARGO_STAFF) {
-    return interaction.member.permissions?.has('ManageGuild');
-  }
-
-  return interaction.member.roles?.cache?.has(CARGO_STAFF);
-}
-
-// ============================================================================
-// 🏁 GERAR EMBED PRINCIPAL
-// ============================================================================
-
+/**
+ * 📊 Gera o Embed Principal do Painel de Eventos com dados em tempo real
+ */
 function gerarEmbedPainelEvento() {
   const totalInscritos = db.inscritosEvento.size;
-
   let totalPagos = 0;
   let arrecadado = 0;
 
   for (const item of db.inscritosEvento.values()) {
     if (item.pago) {
       totalPagos++;
-      arrecadado += VALOR_INSCRICAO;
+      arrecadado += (item.valorPago || configLS.taxaInscricaoEvento);
     }
   }
 
-  const pendentes = totalInscritos - totalPagos;
-
-  const statusEvento = db.eventoConfig.aberto
-    ? '🟢 INSCRIÇÕES ABERTAS'
-    : '🔴 INSCRIÇÕES ENCERRADAS';
-
-  return new EmbedBuilder()
-    .setColor(db.eventoConfig.aberto ? '#2ECC71' : '#E74C3C')
+  const embed = new EmbedBuilder()
+    .setColor(configLS.corLS || '#2ECC71')
     .setTitle('🏁🔥 EVENTO AUTOMOTIVO — LS CUSTOMS 🔧')
     .setDescription(
       '🚗 **PREPARE SEU MELHOR PROJETO!** 💨\n\n' +
-
-      'A **LS Customs** está reunindo os melhores projetos automotivos da cidade!\n\n' +
-
+      'A **LS Customs** está preparando um mega evento para reunir os **melhores carros e projetos customizados** da cidade!\n\n' +
+      'Mostre seu motor, estética, suspensão e venha competir pelo pódio mais cobiçado de Los Santos! 🔥\n\n' +
       '━━━━━━━━━━━━━━━━━━━━━━\n\n' +
-
-      `🎟️ **INSCRIÇÃO:** \`R$ ${VALOR_INSCRICAO.toLocaleString('pt-BR')}\`\n\n` +
-
-      '🏆 **PREMIAÇÃO OFICIAL**\n' +
+      '🎟️ **INSCRIÇÃO DO VEÍCULO:** `R$ 10.000`\n\n' +
+      '🏆 **PREMIAÇÃO OFICIAL (R$ 100.000 em Prêmios):**\n' +
       '🥇 **1º Lugar:** 💰 `R$ 50.000`\n' +
       '🥈 **2º Lugar:** 💰 `R$ 30.000`\n' +
       '🥉 **3º Lugar:** 💰 `R$ 20.000`\n\n' +
-
       '━━━━━━━━━━━━━━━━━━━━━━\n\n' +
-
-      `📢 **STATUS:** ${statusEvento}\n\n` +
-
-      '📊 **DADOS DO EVENTO**\n' +
-      `👥 **Participantes:** \`${totalInscritos}\`\n` +
-      `🟢 **Pagamentos Confirmados:** \`${totalPagos}\`\n` +
-      `🟡 **Pagamentos Pendentes:** \`${pendentes}\`\n` +
-      `💰 **Arrecadado:** \`R$ ${arrecadado.toLocaleString('pt-BR')}\`\n\n` +
-
+      '📋 **CRITÉRIOS DE AVALIAÇÃO:**\n' +
+      '🎨 **Customização & Pintura** | ⚡ **Performance & Motor**\n' +
+      '🚘 **Originalidade do Projeto** | 🔥 **Presença & Estilo**\n\n' +
       '━━━━━━━━━━━━━━━━━━━━━━\n\n' +
-
-      '🎨 **CRITÉRIOS DE AVALIAÇÃO**\n' +
-      '• Customização & Estética\n' +
-      '• Performance\n' +
-      '• Originalidade\n' +
-      '• Presença & Acabamento\n\n' +
-
-      '🔥 **Prepare seu projeto e venha disputar o pódio!**'
+      '📊 **STATUS DO EVENTO EM TEMPO REAL:**\n' +
+      `👥 **Total de Inscritos:** \`${totalInscritos}\`\n` +
+      `🟢 **Pagamentos Confirmados:** \`${totalPagos}/${totalInscritos}\`\n` +
+      `💰 **Total Arrecadado na Tesouraria:** \`R$ ${arrecadado.toLocaleString('pt-BR')}\`\n\n` +
+      '━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+      `📍 **Local:** ${db.eventoConfig.local} | ⏰ **Horário:** ${db.eventoConfig.horario}\n` +
+      '> 🔧 *LS Customs — Seu carro, nosso trabalho.*'
     )
     .setImage(configLS.bannerUrl)
-    .setFooter({
-      text: 'LS CUSTOMS • Evento Automotivo • Sistema Oficial'
-    })
+    .setFooter({ text: `LS CUSTOMS • Canal #${configLS.canalEventoId} • Atualização Automática` })
     .setTimestamp();
+
+  return embed;
 }
 
-// ============================================================================
-// 🔘 BOTÕES DO PAINEL
-// ============================================================================
-
+/**
+ * 🎛️ Gera as Fileiras de Botões Interativos do Painel
+ */
 function gerarBotoesPainelEvento() {
-
   const row1 = new ActionRowBuilder().addComponents(
-
     new ButtonBuilder()
       .setCustomId('btn_ev_inscrever')
-      .setLabel('🏎️ Inscrever Veículo')
-      .setStyle(ButtonStyle.Success)
-      .setDisabled(!db.eventoConfig.aberto),
-
+      .setLabel('🏎️ Inscrever Veículo (R$ 10k)')
+      .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('btn_ev_consultar')
       .setLabel('🔎 Minha Inscrição')
       .setStyle(ButtonStyle.Primary),
-
     new ButtonBuilder()
       .setCustomId('btn_ev_lista')
-      .setLabel('📋 Participantes')
+      .setLabel('📋 Lista de Participantes')
       .setStyle(ButtonStyle.Secondary)
   );
 
   const row2 = new ActionRowBuilder().addComponents(
-
     new ButtonBuilder()
       .setCustomId('btn_ev_confirmar_pagamento')
-      .setLabel('💰 Confirmar Pagamento')
+      .setLabel('✅ Confirmar Pagamento (Staff)')
       .setStyle(ButtonStyle.Success),
-
     new ButtonBuilder()
       .setCustomId('btn_ev_podio')
-      .setLabel('🏆 Ver Pódio')
+      .setLabel('🏆 Ver Pódio / Vencedores')
       .setStyle(ButtonStyle.Primary),
-
     new ButtonBuilder()
       .setCustomId('btn_ev_arrecadado')
       .setLabel('📊 Arrecadação')
       .setStyle(ButtonStyle.Secondary)
   );
 
-  const row3 = new ActionRowBuilder().addComponents(
-
-    new ButtonBuilder()
-      .setCustomId('btn_ev_admin')
-      .setLabel('👑 Painel da Liderança')
-      .setStyle(ButtonStyle.Danger)
-  );
-
-  return [row1, row2, row3];
+  return [row1, row2];
 }
 
-// ============================================================================
-// 🔄 ATUALIZAR PAINEL FIXO
-// ============================================================================
-
+/**
+ * 🔄 Atualiza automaticamente a mensagem fixada do Painel no canal
+ */
 async function atualizarPainelNoCanal(client) {
+  try {
+    const canal = client.channels.cache.get(configLS.canalEventoId);
+    if (!canal) return;
 
-  const canal = client.channels.cache.get(configLS.canalEventoId);
+    const embed = gerarEmbedPainelEvento();
+    const rows = gerarBotoesPainelEvento();
 
-  if (!canal) {
-    console.warn(
-      `⚠️ [EVENTO] Canal ${configLS.canalEventoId} não encontrado.`
-    );
-    return;
-  }
-
-  const embed = gerarEmbedPainelEvento();
-  const rows = gerarBotoesPainelEvento();
-
-  if (db.eventoConfig.painelMessageId) {
-
-    try {
-
-      const msg = await canal.messages.fetch(
-        db.eventoConfig.painelMessageId
-      );
-
-      if (msg) {
-
-        await msg.edit({
-          embeds: [embed],
-          components: rows
-        });
-
-        return;
+    if (db.eventoConfig.painelMessageId) {
+      try {
+        const msg = await canal.messages.fetch(db.eventoConfig.painelMessageId);
+        if (msg) {
+          await msg.edit({ embeds: [embed], components: rows });
+          return;
+        }
+      } catch (err) {
+        // Mensagem antiga não encontrada, enviará nova
       }
-
-    } catch (error) {
-
-      console.warn(
-        '⚠️ [EVENTO] Painel antigo não encontrado. Criando novo.'
-      );
-
     }
+
+    const novaMsg = await canal.send({ embeds: [embed], components: rows });
+    db.eventoConfig.painelMessageId = novaMsg.id;
+  } catch (error) {
+    console.error('⚠️ [EVENTOS] Erro ao atualizar painel no canal:', error && error.message ? error.message : error);
   }
-
-  const novaMsg = await canal.send({
-    embeds: [embed],
-    components: rows
-  });
-
-  db.eventoConfig.painelMessageId = novaMsg.id;
-
-  console.log(
-    `🏁 [EVENTO] Painel criado: ${novaMsg.id}`
-  );
 }
 
-// ============================================================================
-// 📝 MODAL DE INSCRIÇÃO
-// ============================================================================
-
-function criarModalInscricao() {
-
+/**
+ * 📝 Cria e Exibe o Modal de Inscrição / Registro de Veículo
+ */
+async function abrirModalInscricao(interaction) {
   const modal = new ModalBuilder()
     .setCustomId('modal_ev_inscricao')
-    .setTitle('🏁 Inscrição — Evento LS Customs');
+    .setTitle('Inscrição no Evento Automotivo');
 
-  const nome = new TextInputBuilder()
-    .setCustomId('ev_nome')
-    .setLabel('👤 Nome do participante')
-    .setPlaceholder('Ex: Henrique Souza')
+  const inputNome = new TextInputBuilder()
+    .setCustomId('ev_input_nome')
+    .setLabel('Nome do Piloto (Personagem)')
     .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setMaxLength(50);
+    .setPlaceholder('Ex: Carlos Mendes')
+    .setRequired(true);
 
-  const passaporte = new TextInputBuilder()
-    .setCustomId('ev_passaporte')
-    .setLabel('🆔 Passaporte / ID')
-    .setPlaceholder('Ex: 123')
+  const inputPassaporte = new TextInputBuilder()
+    .setCustomId('ev_input_id')
+    .setLabel('Passaporte / ID na Cidade')
     .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setMaxLength(20);
+    .setPlaceholder('Ex: 793')
+    .setRequired(true);
 
-  const veiculo = new TextInputBuilder()
-    .setCustomId('ev_veiculo')
-    .setLabel('🚗 Nome do veículo')
-    .setPlaceholder('Ex: Nissan Skyline R34')
+  const inputVeiculo = new TextInputBuilder()
+    .setCustomId('ev_input_veiculo')
+    .setLabel('Modelo do Carro & Categoria')
     .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setMaxLength(50);
+    .setPlaceholder('Ex: Nissan Skyline GT-R R34 (JDM / Esportivo)')
+    .setRequired(true);
 
-  const cor = new TextInputBuilder()
-    .setCustomId('ev_cor')
-    .setLabel('🎨 Cor do veículo')
-    .setPlaceholder('Ex: Preto')
+  const inputPlaca = new TextInputBuilder()
+    .setCustomId('ev_input_placa')
+    .setLabel('Placa do Veículo')
     .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setMaxLength(30);
+    .setPlaceholder('Ex: LSC-793')
+    .setRequired(true);
 
-  const observacao = new TextInputBuilder()
-    .setCustomId('ev_observacao')
-    .setLabel('🔥 Descrição do projeto')
-    .setPlaceholder('Ex: Projeto esportivo com visual exclusivo...')
+  const inputCustom = new TextInputBuilder()
+    .setCustomId('ev_input_custom')
+    .setLabel('Preparação, Motor & Modificações')
     .setStyle(TextInputStyle.Paragraph)
-    .setRequired(false)
-    .setMaxLength(500);
+    .setPlaceholder('Ex: Stage 4 Twin Turbo, Kit Widebody, Pintura Midnight Purple, Rodas BBS aro 19...')
+    .setRequired(false);
 
   modal.addComponents(
-    new ActionRowBuilder().addComponents(nome),
-    new ActionRowBuilder().addComponents(passaporte),
-    new ActionRowBuilder().addComponents(veiculo),
-    new ActionRowBuilder().addComponents(cor),
-    new ActionRowBuilder().addComponents(observacao)
+    new ActionRowBuilder().addComponents(inputNome),
+    new ActionRowBuilder().addComponents(inputPassaporte),
+    new ActionRowBuilder().addComponents(inputVeiculo),
+    new ActionRowBuilder().addComponents(inputPlaca),
+    new ActionRowBuilder().addComponents(inputCustom)
   );
 
-  return modal;
+  await interaction.showModal(modal);
 }
 
-// ============================================================================
-// 💰 MODAL DE CONFIRMAÇÃO DE PAGAMENTO
-// ============================================================================
+/**
+ * 💾 Processa a Submissão do Modal de Inscrição
+ */
+async function processarInscricao(interaction, client) {
+  const nome = interaction.fields.getTextInputValue('ev_input_nome').trim();
+  const passaporte = interaction.fields.getTextInputValue('ev_input_id').replace('#', '').trim();
+  const veiculo = interaction.fields.getTextInputValue('ev_input_veiculo').trim();
+  const placa = interaction.fields.getTextInputValue('ev_input_placa').toUpperCase().trim();
+  const custom = interaction.fields.getTextInputValue('ev_input_custom') || 'Projeto original limpo e polido.';
 
-function criarModalPagamento() {
+  // Salva no banco de dados centralizado
+  db.inscritosEvento.set(interaction.user.id, {
+    userId: interaction.user.id,
+    userTag: interaction.user.tag,
+    nome,
+    passaporte,
+    veiculo,
+    placa,
+    custom,
+    pago: false,
+    valorPago: 0,
+    dataInscricao: new Date(),
+    dataPagamento: null,
+    notas: { customizacao: 0, performance: 0, originalidade: 0, presenca: 0 },
+    media: 0
+  });
 
-  const modal = new ModalBuilder()
-    .setCustomId('modal_ev_pagamento')
-    .setTitle('💰 Confirmar Pagamento');
-
-  const usuario = new TextInputBuilder()
-    .setCustomId('ev_pagamento_usuario')
-    .setLabel('🆔 ID do participante')
-    .setPlaceholder('Digite o ID Discord do participante')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  const comprovante = new TextInputBuilder()
-    .setCustomId('ev_pagamento_comprovante')
-    .setLabel('🧾 Comprovante / Referência')
-    .setPlaceholder('Ex: Pagamento recebido')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(usuario),
-    new ActionRowBuilder().addComponents(comprovante)
-  );
-
-  return modal;
-}
-
-// ============================================================================
-// 📋 LISTA DE PARTICIPANTES
-// ============================================================================
-
-function gerarListaParticipantes() {
-
-  if (db.inscritosEvento.size === 0) {
-
-    return new EmbedBuilder()
-      .setColor('#F39C12')
-      .setTitle('📋 LISTA DE PARTICIPANTES')
+  // Notifica no canal oficial
+  const canal = client.channels.cache.get(configLS.canalEventoId);
+  if (canal) {
+    const alertEmbed = new EmbedBuilder()
+      .setColor('#2ECC71')
+      .setTitle('🏎️ NOVA INSCRIÇÃO REGISTRADA NO EVENTO!')
       .setDescription(
-        'Ainda não existem participantes inscritos no evento.'
+        `👤 **Piloto:** <@${interaction.user.id}> (${nome})\n` +
+        `🆔 **Passaporte:** #${passaporte}\n` +
+        `🚗 **Veículo:** **${veiculo}**\n` +
+        `🏷️ **Placa:** \`${placa}\`\n\n` +
+        `🔧 **Preparação & Detalhes:**\n${custom}\n\n` +
+        `💰 **Taxa:** R$ 10.000 — Status: 🟡 **AGUARDANDO PAGAMENTO**\n` +
+        `*Procure a gerência da LS Customs para validar sua inscrição!*`
       )
-      .setFooter({
-        text: 'LS CUSTOMS • Evento Automotivo'
-      });
+      .setFooter({ text: 'LS Customs • Eventos Automotivos' })
+      .setTimestamp();
+
+    await canal.send({ embeds: [alertEmbed] }).catch(() => null);
   }
 
-  let texto = '';
+  // Atualiza o painel fixo
+  await atualizarPainelNoCanal(client);
 
-  let contador = 0;
-
-  for (const item of db.inscritosEvento.values()) {
-
-    contador++;
-
-    const pagamento = item.pago
-      ? '🟢 Pago'
-      : '🟡 Pendente';
-
-    texto +=
-      `**${String(contador).padStart(2, '0')}.** ` +
-      `<@${item.userId}>\n` +
-      `🚗 **Veículo:** ${item.veiculo}\n` +
-      `🆔 **Passaporte:** #${item.passaporte}\n` +
-      `🎨 **Cor:** ${item.cor}\n` +
-      `💰 **Pagamento:** ${pagamento}\n\n`;
-  }
-
-  return new EmbedBuilder()
-    .setColor('#3498DB')
-    .setTitle('📋 PARTICIPANTES — EVENTO LS CUSTOMS')
-    .setDescription(texto.slice(0, 4096))
-    .setFooter({
-      text: `Total de participantes: ${contador}`
-    })
-    .setTimestamp();
+  await interaction.reply({
+    content: `✅ **Parabéns ${nome}!** Seu veículo **${veiculo}** (Placa: \`${placa}\`) foi registrado com sucesso!\n\n` +
+             `💳 Para confirmar sua vaga na disputa e concorrer aos **R$ 100.000 em prêmios**, pague a taxa de **R$ 10.000** na tesouraria da LS Customs.`,
+    ephemeral: true
+  });
 }
 
-// ============================================================================
-// 🔎 MINHA INSCRIÇÃO
-// ============================================================================
+/**
+ * 🔎 Consulta a Inscrição do Usuário
+ */
+async function consultarInscricao(interaction) {
+  const dados = db.inscritosEvento.get(interaction.user.id);
 
-function gerarMinhaInscricao(userId) {
-
-  const item = db.inscritosEvento.get(userId);
-
-  if (!item) {
-
-    return new EmbedBuilder()
-      .setColor('#F39C12')
-      .setTitle('🔎 MINHA INSCRIÇÃO')
-      .setDescription(
-        '❌ Você ainda não possui uma inscrição registrada neste evento.\n\n' +
-        'Clique em **🏎️ Inscrever Veículo** para participar.'
-      );
+  if (!dados) {
+    return interaction.reply({
+      content: '❌ Você ainda não inscreveu nenhum veículo no Evento Automotivo. Clique em **🏎️ Inscrever Veículo** para participar!',
+      ephemeral: true
+    });
   }
 
-  return new EmbedBuilder()
-    .setColor(item.pago ? '#2ECC71' : '#F39C12')
-    .setTitle('🏁 MINHA INSCRIÇÃO — LS CUSTOMS')
+  const status = dados.pago 
+    ? '🟢 **PAGAMENTO CONFIRMADO (VAGA GARANTIDA)**' 
+    : '🟡 **PAGAMENTO PENDENTE (R$ 10.000)**';
+
+  const embed = new EmbedBuilder()
+    .setColor(dados.pago ? '#2ECC71' : '#F59E0B')
+    .setTitle(`🔎 SUA INSCRIÇÃO — ${dados.veiculo}`)
     .setDescription(
-      `👤 **Participante:** <@${item.userId}>\n` +
-      `🆔 **Passaporte:** #${item.passaporte}\n` +
-      `🚗 **Veículo:** ${item.veiculo}\n` +
-      `🎨 **Cor:** ${item.cor}\n` +
-      `💰 **Pagamento:** ${item.pago ? '🟢 CONFIRMADO' : '🟡 PENDENTE'}\n` +
-      `📅 **Inscrição:** ${new Date(item.dataInscricao).toLocaleString('pt-BR')}\n\n` +
-      `🔥 **Projeto:** ${item.observacao || 'Nenhuma descrição informada.'}`
+      `👤 **Piloto:** ${dados.nome} (<@${dados.userId}>)\n` +
+      `🆔 **Passaporte:** #${dados.passaporte}\n` +
+      `🚗 **Veículo:** **${dados.veiculo}**\n` +
+      `🏷️ **Placa:** \`${dados.placa}\`\n` +
+      `🔧 **Modificações:** ${dados.custom}\n\n` +
+      `💳 **Status:** ${status}\n` +
+      `📅 **Data da Inscrição:** ${dados.dataInscricao.toLocaleDateString('pt-BR')} às ${dados.dataInscricao.toLocaleTimeString('pt-BR')}`
     )
-    .setFooter({
-      text: 'LS CUSTOMS • Sistema de Eventos'
-    })
-    .setTimestamp();
+    .setFooter({ text: 'LS Customs • Consulta de Inscrição' });
+
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-// ============================================================================
-// 🏆 PÓDIO
-// ============================================================================
+/**
+ * 📋 Lista de Participantes e Veículos
+ */
+async function listarParticipantes(interaction) {
+  const total = db.inscritosEvento.size;
 
-function gerarEmbedPodio() {
-
-  const primeiro = db.eventoConfig.primeiroLugar;
-  const segundo = db.eventoConfig.segundoLugar;
-  const terceiro = db.eventoConfig.terceiroLugar;
-
-  return new EmbedBuilder()
-    .setColor('#F1C40F')
-    .setTitle('🏆🔥 PÓDIO — EVENTO AUTOMOTIVO LS CUSTOMS')
-    .setDescription(
-      `🥇 **1º LUGAR — R$ 50.000**\n` +
-      `${primeiro ? `<@${primeiro.userId}> — 🚗 ${primeiro.veiculo}` : '⏳ Ainda não definido'}\n\n` +
-
-      `🥈 **2º LUGAR — R$ 30.000**\n` +
-      `${segundo ? `<@${segundo.userId}> — 🚗 ${segundo.veiculo}` : '⏳ Ainda não definido'}\n\n` +
-
-      `🥉 **3º LUGAR — R$ 20.000**\n` +
-      `${terceiro ? `<@${terceiro.userId}> — 🚗 ${terceiro.veiculo}` : '⏳ Ainda não definido'}`
-    )
-    .setImage(configLS.bannerUrl)
-    .setFooter({
-      text: 'LS CUSTOMS • Pódio Oficial'
-    })
-    .setTimestamp();
-}
-
-// ============================================================================
-// 📊 ARRECADAÇÃO
-// ============================================================================
-
-function gerarEmbedArrecadacao() {
-
-  let pagos = 0;
-  let pendentes = 0;
-
-  for (const item of db.inscritosEvento.values()) {
-
-    if (item.pago) {
-      pagos++;
-    } else {
-      pendentes++;
-    }
+  if (total === 0) {
+    return interaction.reply({
+      content: '📋 Nenhum participante se inscreveu no momento. Seja o primeiro a inscrever sua máquina!',
+      ephemeral: true
+    });
   }
 
-  const arrecadado = pagos * VALOR_INSCRICAO;
-  const previsto = db.inscritosEvento.size * VALOR_INSCRICAO;
+  let desc = `🏁 **GRID DE PARTICIPANTES — LS CUSTOMS**\nTotal de Inscritos: **${total}**\n\n`;
+  let idx = 1;
 
-  return new EmbedBuilder()
+  for (const [uid, dados] of db.inscritosEvento.entries()) {
+    const statusIcon = dados.pago ? '🟢 PAGO' : '🟡 PENDENTE';
+    desc += `**${idx}.** <@${uid}> (${dados.nome}) | ID #${dados.passaporte}\n`;
+    desc += `🏎️ **${dados.veiculo}** [Placa: \`${dados.placa}\`] — ${statusIcon}\n\n`;
+    idx++;
+  }
+
+  const embed = new EmbedBuilder()
     .setColor('#2ECC71')
-    .setTitle('📊 ARRECADAÇÃO — EVENTO LS CUSTOMS')
-    .setDescription(
-      `👥 **Total de inscritos:** ${db.inscritosEvento.size}\n` +
-      `🟢 **Pagamentos confirmados:** ${pagos}\n` +
-      `🟡 **Pagamentos pendentes:** ${pendentes}\n\n` +
+    .setTitle('📋 LISTA DE PARTICIPANTES & MÁQUINAS')
+    .setDescription(desc)
+    .setFooter({ text: `Taxa: R$ 10.000 • Premiação Total: R$ 100.000` });
 
-      `💰 **Valor por inscrição:** R$ ${VALOR_INSCRICAO.toLocaleString('pt-BR')}\n` +
-      `💵 **Total arrecadado:** R$ ${arrecadado.toLocaleString('pt-BR')}\n` +
-      `📈 **Total previsto:** R$ ${previsto.toLocaleString('pt-BR')}\n\n` +
-
-      `🏆 **Premiação:** R$ 100.000`
-    )
-    .setFooter({
-      text: 'LS CUSTOMS • Financeiro do Evento'
-    })
-    .setTimestamp();
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-// ============================================================================
-// 👑 PAINEL DA LIDERANÇA
-// ============================================================================
-
-function gerarPainelAdmin() {
-
-  return new EmbedBuilder()
-    .setColor('#E74C3C')
-    .setTitle('👑 PAINEL DA LIDERANÇA — EVENTO')
-    .setDescription(
-      'Área exclusiva da liderança da LS Customs.\n\n' +
-      'Use os botões abaixo para administrar o evento.\n\n' +
-      `📊 Participantes: **${db.inscritosEvento.size}**\n` +
-      `📢 Status: **${db.eventoConfig.aberto ? 'Aberto' : 'Encerrado'}**`
-    );
-}
-
-function gerarBotoesAdmin() {
-
-  return [
-    new ActionRowBuilder().addComponents(
-
-      new ButtonBuilder()
-        .setCustomId('btn_ev_fechar')
-        .setLabel('🔒 Fechar Inscrições')
-        .setStyle(ButtonStyle.Danger)
-        .setDisabled(!db.eventoConfig.aberto),
-
-      new ButtonBuilder()
-        .setCustomId('btn_ev_abrir')
-        .setLabel('🔓 Abrir Inscrições')
-        .setStyle(ButtonStyle.Success)
-        .setDisabled(db.eventoConfig.aberto),
-
-      new ButtonBuilder()
-        .setCustomId('btn_ev_admin_pagamento')
-        .setLabel('💰 Registrar Pagamento')
-        .setStyle(ButtonStyle.Primary)
-    )
-  ];
-}
-
-// ============================================================================
-// 🏆 MODAL PARA DEFINIR PÓDIO
-// ============================================================================
-
-function criarModalPodio() {
-
+/**
+ * ✅ Modal e Ação de Confirmar Pagamento (Staff)
+ */
+async function abrirModalConfirmarPagamento(interaction) {
   const modal = new ModalBuilder()
-    .setCustomId('modal_ev_podio')
-    .setTitle('🏆 Registrar Pódio');
+    .setCustomId('modal_ev_confirmar_pagamento')
+    .setTitle('Confirmar Pagamento de Inscrição');
 
-  const primeiro = new TextInputBuilder()
-    .setCustomId('podio_1')
-    .setLabel('🥇 ID Discord — 1º Lugar')
-    .setPlaceholder('ID do vencedor')
+  const inputId = new TextInputBuilder()
+    .setCustomId('ev_pay_id')
+    .setLabel('Passaporte / ID ou Mencione o Piloto')
     .setStyle(TextInputStyle.Short)
-    .setRequired(false);
+    .setPlaceholder('Ex: 793 ou 123456789012345678')
+    .setRequired(true);
 
-  const segundo = new TextInputBuilder()
-    .setCustomId('podio_2')
-    .setLabel('🥈 ID Discord — 2º Lugar')
-    .setPlaceholder('ID do segundo colocado')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(false);
-
-  const terceiro = new TextInputBuilder()
-    .setCustomId('podio_3')
-    .setLabel('🥉 ID Discord — 3º Lugar')
-    .setPlaceholder('ID do terceiro colocado')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(false);
-
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(primeiro),
-    new ActionRowBuilder().addComponents(segundo),
-    new ActionRowBuilder().addComponents(terceiro)
-  );
-
-  return modal;
+  modal.addComponents(new ActionRowBuilder().addComponents(inputId));
+  await interaction.showModal(modal);
 }
 
-// ============================================================================
-// 🖱️ TRATAMENTO CENTRAL DAS INTERAÇÕES DO EVENTO
-// ============================================================================
+/**
+ * 💰 Processa a confirmação de pagamento
+ */
+async function processarConfirmacaoPagamento(interaction, client) {
+  const busca = interaction.fields.getTextInputValue('ev_pay_id').replace(/[<@!#>]/g, '').trim();
 
+  let encontrado = null;
+
+  for (const [uid, dados] of db.inscritosEvento.entries()) {
+    if (uid === busca || dados.passaporte === busca || dados.nome.toLowerCase().includes(busca.toLowerCase())) {
+      encontrado = dados;
+      break;
+    }
+  }
+
+  if (!encontrado) {
+    return interaction.reply({
+      content: `❌ Não foi encontrado nenhum inscrito com a identificação: \`${busca}\`.`,
+      ephemeral: true
+    });
+  }
+
+  encontrado.pago = true;
+  encontrado.valorPago = configLS.taxaInscricaoEvento;
+  encontrado.dataPagamento = new Date();
+
+  // Atualiza o painel
+  await atualizarPainelNoCanal(client);
+
+  const embed = new EmbedBuilder()
+    .setColor('#2ECC71')
+    .setTitle('💰 PAGAMENTO CONFIRMADO COM SUCESSO!')
+    .setDescription(
+      `✅ O pagamento da inscrição do piloto **${encontrado.nome}** (ID #${encontrado.passaporte}) foi validado!\n\n` +
+      `🚗 **Veículo:** ${encontrado.veiculo}\n` +
+      `🏷️ **Placa:** \`${encontrado.placa}\`\n` +
+      `💰 **Valor Recebido:** R$ 10.000\n` +
+      `👤 **Validado por:** <@${interaction.user.id}>`
+    )
+    .setTimestamp();
+
+  await interaction.reply({ embeds: [embed] });
+}
+
+/**
+ * 🏆 Exibir ou Registrar Pódio
+ */
+async function exibirPodio(interaction) {
+  const { primeiro, segundo, terceiro } = db.podioEvento;
+
+  const desc = 
+    `🥇 **1º LUGAR (R$ 50.000):** ${primeiro ? `**${primeiro.nome}** — ${primeiro.veiculo}` : '*A definir pelos jurados*'}\n\n` +
+    `🥈 **2º LUGAR (R$ 30.000):** ${segundo ? `**${segundo.nome}** — ${segundo.veiculo}` : '*A definir pelos jurados*'}\n\n` +
+    `🥉 **3º LUGAR (R$ 20.000):** ${terceiro ? `**${terceiro.nome}** — ${terceiro.veiculo}` : '*A definir pelos jurados*'}\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `💰 **Total em Prêmios:** R$ 100.000\n` +
+    `🔧 **Avaliação:** Estética, Performance, Originalidade e Presença.`;
+
+  const embed = new EmbedBuilder()
+    .setColor('#F59E0B')
+    .setTitle('🏆 PÓDIO OFICIAL DO EVENTO AUTOMOTIVO')
+    .setDescription(desc)
+    .setFooter({ text: 'LS Customs • Premiações' });
+
+  await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+/**
+ * 📊 Exibir Arrecadação Total
+ */
+async function exibirArrecadacao(interaction) {
+  let totalPagos = 0;
+  let arrecadado = 0;
+
+  for (const item of db.inscritosEvento.values()) {
+    if (item.pago) {
+      totalPagos++;
+      arrecadado += (item.valorPago || configLS.taxaInscricaoEvento);
+    }
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor('#2ECC71')
+    .setTitle('📊 ARRECADAÇÃO DA TESOURARIA DO EVENTO')
+    .setDescription(
+      `💰 **Total Arrecadado:** \`R$ ${arrecadado.toLocaleString('pt-BR')}\`\n` +
+      `👥 **Inscrições Pagas:** \`${totalPagos}\` de \`${db.inscritosEvento.size}\` inscritos\n` +
+      `🎟️ **Taxa Individual:** \`R$ 10.000\`\n` +
+      `🏆 **Premiação Reservada:** \`R$ 100.000\``
+    )
+    .setFooter({ text: 'LS Customs • Tesouraria' });
+
+  await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+/**
+ * 🎯 Roteador Principal de Interações de Eventos
+ */
 async function tratarInteracaoEvento(interaction, client) {
-
-  // ========================================================================
-  // 🔘 BOTÕES
-  // ========================================================================
-
+  // 1. Botões
   if (interaction.isButton()) {
-
-    const id = interaction.customId;
-
-    // ----------------------------------------------------------------------
-    // 🏎️ INSCRIÇÃO
-    // ----------------------------------------------------------------------
-
-    if (id === 'btn_ev_inscrever') {
-
-      if (!db.eventoConfig.aberto) {
-
-        await interaction.reply({
-          content: '🔒 As inscrições para este evento estão encerradas.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      if (db.inscritosEvento.has(interaction.user.id)) {
-
-        await interaction.reply({
-          content: '⚠️ Você já possui uma inscrição neste evento.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      await interaction.showModal(criarModalInscricao());
-
-      return true;
+    switch (interaction.customId) {
+      case 'btn_ev_inscrever':
+        return await abrirModalInscricao(interaction);
+      case 'btn_ev_consultar':
+        return await consultarInscricao(interaction);
+      case 'btn_ev_lista':
+        return await listarParticipantes(interaction);
+      case 'btn_ev_confirmar_pagamento':
+        return await abrirModalConfirmarPagamento(interaction);
+      case 'btn_ev_podio':
+        return await exibirPodio(interaction);
+      case 'btn_ev_arrecadado':
+        return await exibirArrecadacao(interaction);
     }
-
-    // ----------------------------------------------------------------------
-    // 🔎 CONSULTAR
-    // ----------------------------------------------------------------------
-
-    if (id === 'btn_ev_consultar') {
-
-      await interaction.reply({
-        embeds: [
-          gerarMinhaInscricao(interaction.user.id)
-        ],
-        ephemeral: true
-      });
-
-      return true;
-    }
-
-    // ----------------------------------------------------------------------
-    // 📋 LISTA
-    // ----------------------------------------------------------------------
-
-    if (id === 'btn_ev_lista') {
-
-      await interaction.reply({
-        embeds: [
-          gerarListaParticipantes()
-        ],
-        ephemeral: true
-      });
-
-      return true;
-    }
-
-    // ----------------------------------------------------------------------
-    // 💰 PAGAMENTO STAFF
-    // ----------------------------------------------------------------------
-
-    if (id === 'btn_ev_confirmar_pagamento') {
-
-      if (!usuarioEhStaff(interaction)) {
-
-        await interaction.reply({
-          content: '⛔ Apenas a **Liderança/Staff** pode confirmar pagamentos.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      await interaction.showModal(
-        criarModalPagamento()
-      );
-
-      return true;
-    }
-
-    // ----------------------------------------------------------------------
-    // 🏆 PÓDIO
-    // ----------------------------------------------------------------------
-
-    if (id === 'btn_ev_podio') {
-
-      await interaction.reply({
-        embeds: [
-          gerarEmbedPodio()
-        ],
-        ephemeral: true
-      });
-
-      return true;
-    }
-
-    // ----------------------------------------------------------------------
-    // 📊 ARRECADAÇÃO
-    // ----------------------------------------------------------------------
-
-    if (id === 'btn_ev_arrecadado') {
-
-      if (!usuarioEhStaff(interaction)) {
-
-        await interaction.reply({
-          content: '⛔ A arrecadação é visível apenas para a liderança.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      await interaction.reply({
-        embeds: [
-          gerarEmbedArrecadacao()
-        ],
-        ephemeral: true
-      });
-
-      return true;
-    }
-
-    // ----------------------------------------------------------------------
-    // 👑 ADMIN
-    // ----------------------------------------------------------------------
-
-    if (id === 'btn_ev_admin') {
-
-      if (!usuarioEhStaff(interaction)) {
-
-        await interaction.reply({
-          content: '⛔ Você não possui permissão para acessar o painel da liderança.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      await interaction.reply({
-        embeds: [
-          gerarPainelAdmin()
-        ],
-        components: gerarBotoesAdmin(),
-        ephemeral: true
-      });
-
-      return true;
-    }
-
-    // ----------------------------------------------------------------------
-    // 🔒 FECHAR
-    // ----------------------------------------------------------------------
-
-    if (id === 'btn_ev_fechar') {
-
-      if (!usuarioEhStaff(interaction)) {
-
-        await interaction.reply({
-          content: '⛔ Sem permissão.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      db.eventoConfig.aberto = false;
-
-      await atualizarPainelNoCanal(client);
-
-      await interaction.reply({
-        content: '🔒 **Inscrições encerradas com sucesso!**',
-        ephemeral: true
-      });
-
-      return true;
-    }
-
-    // ----------------------------------------------------------------------
-    // 🔓 ABRIR
-    // ----------------------------------------------------------------------
-
-    if (id === 'btn_ev_abrir') {
-
-      if (!usuarioEhStaff(interaction)) {
-
-        await interaction.reply({
-          content: '⛔ Sem permissão.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      db.eventoConfig.aberto = true;
-
-      await atualizarPainelNoCanal(client);
-
-      await interaction.reply({
-        content: '🔓 **Inscrições abertas novamente!**',
-        ephemeral: true
-      });
-
-      return true;
-    }
-
-    // ----------------------------------------------------------------------
-    // 💰 ADMIN PAGAMENTO
-    // ----------------------------------------------------------------------
-
-    if (id === 'btn_ev_admin_pagamento') {
-
-      if (!usuarioEhStaff(interaction)) {
-
-        await interaction.reply({
-          content: '⛔ Sem permissão.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      await interaction.showModal(
-        criarModalPagamento()
-      );
-
-      return true;
-    }
-
-    return false;
   }
 
-  // ========================================================================
-  // 📝 MODAIS
-  // ========================================================================
-
+  // 2. Modais
   if (interaction.isModalSubmit()) {
-
-    const id = interaction.customId;
-
-    // ----------------------------------------------------------------------
-    // 🏎️ NOVA INSCRIÇÃO
-    // ----------------------------------------------------------------------
-
-    if (id === 'modal_ev_inscricao') {
-
-      if (!db.eventoConfig.aberto) {
-
-        await interaction.reply({
-          content: '🔒 As inscrições estão encerradas.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      if (db.inscritosEvento.has(interaction.user.id)) {
-
-        await interaction.reply({
-          content: '⚠️ Você já possui uma inscrição.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      const nome =
-        interaction.fields
-          .getTextInputValue('ev_nome')
-          .trim();
-
-      const passaporte =
-        interaction.fields
-          .getTextInputValue('ev_passaporte')
-          .trim();
-
-      const veiculo =
-        interaction.fields
-          .getTextInputValue('ev_veiculo')
-          .trim();
-
-      const cor =
-        interaction.fields
-          .getTextInputValue('ev_cor')
-          .trim();
-
-      const observacao =
-        interaction.fields
-          .getTextInputValue('ev_observacao')
-          .trim();
-
-      db.inscritosEvento.set(
-        interaction.user.id,
-        {
-          userId: interaction.user.id,
-          nome,
-          passaporte,
-          veiculo,
-          cor,
-          observacao,
-          pago: false,
-          dataInscricao: new Date()
-        }
-      );
-
-      await atualizarPainelNoCanal(client);
-
-      await interaction.reply({
-        content:
-          '🏁 **INSCRIÇÃO REALIZADA COM SUCESSO!**\n\n' +
-          `👤 Participante: **${nome}**\n` +
-          `🆔 Passaporte: **#${passaporte}**\n` +
-          `🚗 Veículo: **${veiculo}**\n` +
-          `🎨 Cor: **${cor}**\n` +
-          `💰 Pagamento: **🟡 Pendente**\n\n` +
-          `🎟️ Valor da inscrição: **R$ ${VALOR_INSCRICAO.toLocaleString('pt-BR')}**\n\n` +
-          'Aguarde a liderança confirmar seu pagamento.',
-        ephemeral: true
-      });
-
-      return true;
+    switch (interaction.customId) {
+      case 'modal_ev_inscricao':
+        return await processarInscricao(interaction, client);
+      case 'modal_ev_confirmar_pagamento':
+        return await processarConfirmacaoPagamento(interaction, client);
     }
-
-    // ----------------------------------------------------------------------
-    // 💰 CONFIRMAR PAGAMENTO
-    // ----------------------------------------------------------------------
-
-    if (id === 'modal_ev_pagamento') {
-
-      if (!usuarioEhStaff(interaction)) {
-
-        await interaction.reply({
-          content: '⛔ Apenas a liderança pode confirmar pagamentos.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      const userId =
-        interaction.fields
-          .getTextInputValue('ev_pagamento_usuario')
-          .trim();
-
-      const comprovante =
-        interaction.fields
-          .getTextInputValue('ev_pagamento_comprovante')
-          .trim();
-
-      const inscricao =
-        db.inscritosEvento.get(userId);
-
-      if (!inscricao) {
-
-        await interaction.reply({
-          content:
-            `❌ Não encontrei uma inscrição para o ID **${userId}**.`,
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      inscricao.pago = true;
-      inscricao.comprovante = comprovante;
-      inscricao.pagamentoPor = interaction.user.id;
-      inscricao.dataPagamento = new Date();
-
-      db.inscritosEvento.set(
-        userId,
-        inscricao
-      );
-
-      await atualizarPainelNoCanal(client);
-
-      await interaction.reply({
-        content:
-          '✅ **PAGAMENTO CONFIRMADO!**\n\n' +
-          `👤 Participante: <@${userId}>\n` +
-          `🚗 Veículo: **${inscricao.veiculo}**\n` +
-          `💰 Valor: **R$ ${VALOR_INSCRICAO.toLocaleString('pt-BR')}**\n` +
-          `🧾 Comprovante: **${comprovante}**`,
-        ephemeral: true
-      });
-
-      return true;
-    }
-
-    // ----------------------------------------------------------------------
-    // 🏆 REGISTRAR PÓDIO
-    // ----------------------------------------------------------------------
-
-    if (id === 'modal_ev_podio') {
-
-      if (!usuarioEhStaff(interaction)) {
-
-        await interaction.reply({
-          content: '⛔ Apenas a liderança pode registrar o pódio.',
-          ephemeral: true
-        });
-
-        return true;
-      }
-
-      const id1 =
-        interaction.fields.getTextInputValue('podio_1').trim();
-
-      const id2 =
-        interaction.fields.getTextInputValue('podio_2').trim();
-
-      const id3 =
-        interaction.fields.getTextInputValue('podio_3').trim();
-
-      function pegarParticipante(id) {
-
-        if (!id) return null;
-
-        const participante =
-          db.inscritosEvento.get(id);
-
-        if (!participante) return null;
-
-        return {
-          userId: id,
-          veiculo: participante.veiculo
-        };
-      }
-
-      db.eventoConfig.primeiroLugar =
-        pegarParticipante(id1);
-
-      db.eventoConfig.segundoLugar =
-        pegarParticipante(id2);
-
-      db.eventoConfig.terceiroLugar =
-        pegarParticipante(id3);
-
-      await atualizarPainelNoCanal(client);
-
-      await interaction.reply({
-        content:
-          '🏆 **PÓDIO REGISTRADO COM SUCESSO!**\n\n' +
-          `🥇 ${id1 ? `<@${id1}>` : 'Não definido'}\n` +
-          `🥈 ${id2 ? `<@${id2}>` : 'Não definido'}\n` +
-          `🥉 ${id3 ? `<@${id3}>` : 'Não definido'}`,
-        ephemeral: true
-      });
-
-      return true;
-    }
-
-    return false;
   }
-
-  return false;
 }
-
-// ============================================================================
-// 📦 EXPORTAÇÕES
-// ============================================================================
 
 module.exports = {
   gerarEmbedPainelEvento,
   gerarBotoesPainelEvento,
   atualizarPainelNoCanal,
-  tratarInteracaoEvento
+  tratarInteracaoEvento,
+  abrirModalInscricao,
+  processarInscricao,
+  consultarInscricao,
+  listarParticipantes,
+  abrirModalConfirmarPagamento,
+  processarConfirmacaoPagamento,
+  exibirPodio,
+  exibirArrecadacao
 };
