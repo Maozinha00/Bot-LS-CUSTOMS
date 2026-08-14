@@ -403,9 +403,14 @@ client.on(Events.MessageCreate, async (message) => {
       .setColor(CONFIG_LS.corLS)
       .setTitle('⚙️ REGISTRO & RECRUTAMENTO — LS CUSTOMS')
       .setDescription(
-        'Bem-vindo à **Los Santos Customs**!\n\n' +
-        'Deseja fazer parte da equipe oficial de mecânicos?\n' +
-        'Clique no botão abaixo para preencher o questionário de 8 perguntas.\n\n' +
+        'Bem-vindo à **Los Santos Customs**!
+
+' +
+        'Deseja fazer parte da equipe oficial de mecânicos?
+' +
+        'Clique no botão abaixo para preencher o formulário oficial de candidatura.
+
+' +
         'Após o envio, a Liderança da LS Customs avaliará sua candidatura!'
       )
       .setImage(CONFIG_LS.bannerUrl)
@@ -594,45 +599,53 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     }
 
-    // BOTÃO: INICIAR RECRUTAMENTO (ETAPA 1)
+    // BOTÃO: INICIAR RECRUTAMENTO (FORMULÁRIO OFICIAL LS CUSTOMS)
     if (interaction.customId === 'btn_iniciar_recrutamento') {
       const modal = new ModalBuilder()
-        .setCustomId('modal_recrutamento_step1')
-        .setTitle('LS CUSTOMS — Recrutamento (1/2)');
+        .setCustomId('modal_recrutamento_oficial')
+        .setTitle('LS CUSTOMS — Candidatura Oficial');
 
       const inputNome = new TextInputBuilder()
         .setCustomId('rec_nome')
         .setLabel('1. Nome Completo (Personagem)')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: Felipe Souza')
+        .setPlaceholder('Ex: Henrique Silva')
         .setRequired(true);
 
       const inputPassaporte = new TextInputBuilder()
         .setCustomId('rec_passaporte')
         .setLabel('2. Passaporte / ID na Cidade')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: 4192')
+        .setPlaceholder('Ex: 793')
         .setRequired(true);
 
-      const inputIdade = new TextInputBuilder()
-        .setCustomId('rec_idade')
-        .setLabel('3. Idade')
+      const inputIdadeDisp = new TextInputBuilder()
+        .setCustomId('rec_idade_disp')
+        .setLabel('3. Idade e Horários Disponíveis')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: 21')
+        .setPlaceholder('Ex: 21 anos | Tarde e Noite (18h às 23h)')
         .setRequired(true);
 
       const inputExp = new TextInputBuilder()
         .setCustomId('rec_exp')
         .setLabel('4. Experiência como mecânico?')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: 2 meses na Bennys / Nenhuma...')
+        .setPlaceholder('Ex: Sim, já trabalhei na Bennys / Nenhuma')
+        .setRequired(true);
+
+      const inputMotivoRegras = new TextInputBuilder()
+        .setCustomId('rec_motivo_regras')
+        .setLabel('5. Por que a LS Customs? Aceita regras?')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Ex: Quero somar na equipe, respeito clientes e aceito todas as regras e bater ponto.')
         .setRequired(true);
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(inputNome),
         new ActionRowBuilder().addComponents(inputPassaporte),
-        new ActionRowBuilder().addComponents(inputIdade),
-        new ActionRowBuilder().addComponents(inputExp)
+        new ActionRowBuilder().addComponents(inputIdadeDisp),
+        new ActionRowBuilder().addComponents(inputExp),
+        new ActionRowBuilder().addComponents(inputMotivoRegras)
       );
 
       await interaction.showModal(modal);
@@ -664,91 +677,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   // 3. SUBMISSÃO DE MODAIS
   if (interaction.isModalSubmit()) {
-    // SUBMIT: RECRUTAMENTO ETAPA 1 (COM VALIDAÇÃO ANTI-SEM NOÇÃO)
-    if (interaction.customId === 'modal_recrutamento_step1') {
+    // SUBMIT: FORMULÁRIO OFICIAL UNIFICADO
+    if (interaction.customId === 'modal_recrutamento_oficial') {
       const nome = interaction.fields.getTextInputValue('rec_nome');
       const passaporte = interaction.fields.getTextInputValue('rec_passaporte').replace('#', '');
-      const idade = interaction.fields.getTextInputValue('rec_idade');
+      const idadeDisp = interaction.fields.getTextInputValue('rec_idade_disp');
       const experiencia = interaction.fields.getTextInputValue('rec_exp');
+      const motivoRegras = interaction.fields.getTextInputValue('rec_motivo_regras');
 
-      const validacao1 = validarCandidaturaSemNocao({ nome, passaporte, idade, experiencia });
-      if (validacao1.semNocao) {
-        await interaction.reply({
-          content: `❌ **Candidatura Reprovada Automaticamente!**\n\nIdentificamos dados sem noção ou inválidos:\n⚠️ **${validacao1.motivo}**\n\nA LS Customs exige preenchimento sério no formulário.`,
-          ephemeral: true
-        });
-        return;
-      }
-
-      tempRecruitment.set(interaction.user.id, { nome, passaporte, idade, experiencia });
-
-      const modal2 = new ModalBuilder()
-        .setCustomId('modal_recrutamento_step2')
-        .setTitle('LS CUSTOMS — Recrutamento (2/2)');
-
-      const inputMotivo = new TextInputBuilder()
-        .setCustomId('rec_motivo')
-        .setLabel('5. Por que quer entrar na LS Customs?')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Ex: Gosto do RP de mecânico e busco oficina ativa...')
-        .setRequired(true);
-
-      const inputDisp = new TextInputBuilder()
-        .setCustomId('rec_disp')
-        .setLabel('6. Disponibilidade de horários')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: Noite (19h às 00h)')
-        .setRequired(true);
-
-      const inputRegras = new TextInputBuilder()
-        .setCustomId('rec_regras')
-        .setLabel('7. Leu regras e aceita bater ponto?')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Ex: Sim, aceito todas as regras e ponto.')
-        .setRequired(true);
-
-      const inputConflito = new TextInputBuilder()
-        .setCustomId('rec_conflito')
-        .setLabel('8. Como lidaria com cliente estressado?')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Ex: Manter a calma, consultar tabela de preços e chamar um superior.')
-        .setRequired(true);
-
-      modal2.addComponents(
-        new ActionRowBuilder().addComponents(inputMotivo),
-        new ActionRowBuilder().addComponents(inputDisp),
-        new ActionRowBuilder().addComponents(inputRegras),
-        new ActionRowBuilder().addComponents(inputConflito)
-      );
-
-      await interaction.showModal(modal2);
-      return;
-    }
-
-    // SUBMIT: RECRUTAMENTO ETAPA 2 (FINAL - COM VALIDAÇÃO ANTI-SEM NOÇÃO)
-    if (interaction.customId === 'modal_recrutamento_step2') {
-      const step1 = tempRecruitment.get(interaction.user.id) || {};
-      const motivo = interaction.fields.getTextInputValue('rec_motivo');
-      const disponibilidade = interaction.fields.getTextInputValue('rec_disp');
-      const aceitaRegras = interaction.fields.getTextInputValue('rec_regras');
-      const situacaoConflito = interaction.fields.getTextInputValue('rec_conflito');
-
-      const validacao2 = validarCandidaturaSemNocao({
-        nome: step1.nome,
-        passaporte: step1.passaporte,
-        idade: step1.idade,
-        experiencia: step1.experiencia,
-        motivo,
-        disponibilidade,
-        aceitaRegras,
-        situacaoConflito
+      // Validação Anti-Troll e Sem Noção
+      const validacao = validarCandidaturaSemNocao({
+        nome,
+        passaporte,
+        idade: idadeDisp,
+        experiencia,
+        motivo: motivoRegras,
+        aceitaRegras: motivoRegras
       });
 
-      // Se for "sem noção" / troll, reprova na hora!
-      if (validacao2.semNocao) {
-        tempRecruitment.delete(interaction.user.id);
-
-        // Notifica no canal de logs da Staff sobre a tentativa troll
+      if (validacao.semNocao) {
+        // Notifica log de tentativa troll no canal da liderança
         const canalLogs = client.channels.cache.get(CONFIG_LS.canalLogsRecrutamentoId);
         if (canalLogs) {
           const trollEmbed = new EmbedBuilder()
@@ -756,12 +704,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
             .setTitle('🚫 CANDIDATURA REPROVADA AUTOMATICAMENTE (SEM NOÇÃO)')
             .setDescription(
               `👤 **Candidato:** <@${interaction.user.id}> (${interaction.user.tag})\n` +
-              `🆔 **RG/Passaporte:** #${step1.passaporte || 'N/A'}\n` +
-              `⚠️ **Motivo da Reprovação:** ${validacao2.motivo}\n\n` +
+              `🆔 **RG/Passaporte:** #${passaporte || 'N/A'}\n` +
+              `⚠️ **Motivo da Reprovação:** ${validacao.motivo}\n\n` +
               `📝 **Respostas Registradas:**\n` +
-              `• Motivo: ${motivo}\n` +
-              `• Regras: ${aceitaRegras}\n` +
-              `• Conflito: ${situacaoConflito}`
+              `• Nome: ${nome}\n` +
+              `• Idade/Horários: ${idadeDisp}\n` +
+              `• Experiência: ${experiencia}\n` +
+              `• Motivo & Regras: ${motivoRegras}`
             )
             .setFooter({ text: 'Sistema Anti-Troll • LS CUSTOMS' })
             .setTimestamp();
@@ -770,13 +719,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         await interaction.reply({
-          content: `❌ **Candidatura Reprovada Automaticamente!**\n\nIdentificamos respostas sem noção ou inadequadas:\n⚠️ **${validacao2.motivo}**\n\nA LS Customs exige seriedade e respeito às diretrizes de RP.`,
+          content: `❌ **Candidatura Reprovada Automaticamente!**\n\nIdentificamos respostas sem noção ou inadequadas:\n⚠️ **${validacao.motivo}**\n\nA LS Customs exige seriedade e respeito às diretrizes de RP.`,
           ephemeral: true
         });
         return;
       }
 
-      // Enviar ficha completa para o canal da liderança
+      // Envia a ficha completa para o canal da liderança
       const canalLogs = client.channels.cache.get(CONFIG_LS.canalLogsRecrutamentoId);
       if (canalLogs) {
         const fichaEmbed = new EmbedBuilder()
@@ -784,13 +733,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setTitle('📋 NOVA CANDIDATURA DE RECRUTAMENTO')
           .setDescription(
             `👤 **Candidato:** <@${interaction.user.id}> (${interaction.user.tag})\n` +
-            `🆔 **Passaporte:** #${step1.passaporte}\n` +
-            `🎂 **Idade:** ${step1.idade} anos\n` +
-            `🔧 **Experiência:** ${step1.experiencia}\n\n` +
-            `🎯 **5. Motivo de Entrada:** ${motivo}\n` +
-            `⏰ **6. Disponibilidade:** ${disponibilidade}\n` +
-            `📜 **7. Aceita Regras & Ponto:** ${aceitaRegras}\n` +
-            `🤝 **8. Resolução de Conflito:** ${situacaoConflito}`
+            `🆔 **Passaporte:** #${passaporte}\n` +
+            `🎂 **Idade & Horários:** ${idadeDisp}\n` +
+            `🔧 **Experiência Prévia:** ${experiencia}\n\n` +
+            `🎯 **Motivo de Entrada & Regras:**\n${motivoRegras}`
           )
           .setFooter({ text: 'Aguardando avaliação da Liderança LS Customs' })
           .setTimestamp();
@@ -808,8 +754,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         await canalLogs.send({ embeds: [fichaEmbed], components: [row] });
       }
-
-      tempRecruitment.delete(interaction.user.id);
 
       await interaction.reply({
         content: '✅ **Candidatura enviada com sucesso!**\nA Liderança da **LS Customs** analisará suas respostas e aprovará seu registro.',
